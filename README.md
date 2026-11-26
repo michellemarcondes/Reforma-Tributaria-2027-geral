@@ -38,6 +38,13 @@ Campos numéricos aceitam qualquer formato: 2000, 2.000, 2.000,00, 2000,5 ou 1,2
    custo de aquisição do estoque, permite ajustar o inventário de 31/12/2026 (item a item, por % ou
    importando CSV) e monta o cronograma das 12 parcelas a partir do mês de apropriação (até junho/2027).
 
+5. **Fornecedores** — diz quais fornecedores vão gerar crédito de CBS/IBS em 2027. A lista (colada,
+   CSV/TXT/XLSX ou extraída das notas da aba de estoque) é consultada automaticamente na base pública
+   de CNPJ (BrasilAPI, reserva Minha Receita): situação cadastral, Simples e MEI. Para os optantes do
+   Simples, a opção pelo regime regular de 2027 é confirmada no Consulta Optantes da Receita (com
+   captcha; o site abre a consulta) ou importada da planilha gerada pela consulta de regime híbrido.
+   Resultado: crédito integral × limitado ao DAS, com resumo por quantidade e valor e exportação CSV.
+
 Premissas padrão (editáveis na aba *Premissas*): **CBS 11,3%**, **IBS 0,05% estadual + 0,05% municipal**.
 
 ## Como o cálculo foi portado e validado
@@ -57,6 +64,9 @@ Premissas padrão (editáveis na aba *Premissas*): **CBS 11,3%**, **IBS 0,05% es
 - Crédito de estoque: `node tests/gerar-xmls-teste.js /tmp/xmls` gera NF-e de exemplo (revenda, ST,
   alíquota zero, Simples, imobilizado, transferência, devolução, cancelada, duplicada, importação,
   ISO-8859-1 e .zip); `tests/estoque.test.js` confere o motor e `tests/e2e-estoque.js` a aba no navegador.
+- Fornecedores: `tests/fornecedores.test.js <planilha.xlsx> [--rede]` (validação de CNPJ, leitura da lista,
+  classificação, leitura do .xlsx da consulta de regime híbrido, fonte reserva e, com `--rede`, consulta real)
+  e `tests/e2e-fornecedores.js` (aba no navegador, com respostas simuladas da BrasilAPI).
 
 ### Rodar localmente
 

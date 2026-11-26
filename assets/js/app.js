@@ -72,7 +72,7 @@
   }
 
   // ------------------------------------------------------------------ abas
-  var TABS = { sim: 'simulador', painel: 'painel', nota: 'nota', estoque: 'credito-estoque', prem: 'premissas' };
+  var TABS = { sim: 'simulador', painel: 'painel', nota: 'nota', estoque: 'credito-estoque', fornec: 'fornecedores', prem: 'premissas' };
   function abrir(id, push) {
     $$('.tab').forEach(function (t) { t.setAttribute('aria-selected', String(t.id === 't-' + id)); });
     $$('section.view').forEach(function (v) { v.hidden = v.id !== 'v-' + id; });

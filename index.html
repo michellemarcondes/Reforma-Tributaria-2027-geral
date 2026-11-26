@@ -32,6 +32,7 @@
   <button class="tab" role="tab" id="t-painel" aria-controls="v-painel" aria-selected="false"><span class="n">2</span>Painel do contador</button>
   <button class="tab" role="tab" id="t-nota" aria-controls="v-nota" aria-selected="false"><span class="n">3</span>Simulador de nota fiscal</button>
   <button class="tab" role="tab" id="t-estoque" aria-controls="v-estoque" aria-selected="false"><span class="n">4</span>Crédito de estoque</button>
+  <button class="tab" role="tab" id="t-fornec" aria-controls="v-fornec" aria-selected="false"><span class="n">5</span>Fornecedores</button>
   <button class="tab" role="tab" id="t-prem" aria-controls="v-prem" aria-selected="false"><span class="n">⚙</span>Premissas e metodologia</button>
 </nav>
 
@@ -241,6 +242,50 @@
   <div id="e-res" class="result" hidden aria-live="polite"></div>
 </section>
 
+<!-- =============================================================== 5. FORNECEDORES -->
+<section class="view" id="v-fornec" role="tabpanel" aria-labelledby="t-fornec" data-store="rtcg-fornecedores" hidden>
+  <h2 class="sec">Fornecedores: quem vai gerar crédito de CBS/IBS em 2027 <span class="cnt">regime regular × Simples Nacional</span></h2>
+  <div class="box info"><h2><span class="ic">🏷️</span>Como funciona</h2>
+    <p>A partir de 2027, a compra de um fornecedor do <strong>regime regular</strong> (Lucro Real, Lucro Presumido ou Simples que optou pelo regime regular do IBS/CBS — o “regime híbrido”) dá <strong>crédito integral</strong> da CBS/IBS destacada na nota. A compra de um fornecedor do <strong>Simples Nacional que não fez a opção</strong> dá crédito <strong>limitado ao IBS/CBS pago dentro do DAS</strong>.</p>
+    <p><strong>1.</strong> Informe a lista de fornecedores. <strong>2.</strong> O site consulta automaticamente a situação cadastral e a opção pelo Simples/MEI na base pública da Receita (dados abertos, via BrasilAPI). <strong>3.</strong> Para os optantes do Simples, confirme a opção de 2027 no Consulta Optantes da Receita (o portal tem captcha e não permite consulta automática) — ou importe a planilha gerada pela consulta de regime híbrido.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><span class="sig">1. Lista de fornecedores</span><span class="nome">Um por linha: nome e CNPJ (e, se quiser, o valor comprado)</span></div>
+    <div class="field wide"><label for="f-txt">Cole a lista</label>
+      <textarea id="f-txt" rows="5" placeholder="Distribuidora Alfa SA; 10.000.000/0001-91; 125.000,00&#10;Pequeno Fornecedor ME; 20000000000110&#10;33.000.167/0001-01"></textarea>
+      <span class="hint">Aceita CNPJ com ou sem pontuação, separado por ponto e vírgula, tabulação (colar do Excel) ou vírgula. CNPJs com dígito verificador inválido e repetidos são avisados.</span></div>
+    <div class="btns">
+      <button class="btn" type="button" id="f-add">Adicionar à lista</button>
+      <label class="btn sec" for="f-file">Importar arquivo (CSV, TXT ou XLSX)</label><input id="f-file" type="file" accept=".csv,.txt,.xlsx,text/csv,text/plain" hidden>
+      <button class="btn sec" type="button" id="f-notas">Trazer fornecedores das notas (aba Crédito de estoque)</button>
+    </div>
+    <p class="hint-bloco">O .xlsx pode ser a planilha gerada pela consulta de regime híbrido (abas “Fornecedores” e “Resumo”): o site lê as colunas “Vai ser regime híbrido?” e “Eventos futuros” e já preenche a opção de 2027.</p>
+    <div class="btns">
+      <button class="btn" type="button" id="f-consultar">Consultar CNPJs</button>
+      <button class="btn sec" type="button" id="f-repetir">Consultar só pendentes/falhas</button>
+      <button class="btn link" type="button" id="f-limpar">Limpar lista</button>
+      <span class="msg" id="f-msg" role="status"></span>
+    </div>
+    <div class="prog" id="f-prog" hidden><div class="bar"><span id="f-bar"></span></div><span id="f-prog-txt"></span></div>
+  </div>
+
+  <div id="f-res" class="result" hidden aria-live="polite">
+    <div id="f-sum"></div>
+    <h3 class="sub">Fornecedores <span class="nome" id="f-cnt" style="font-weight:400;color:var(--ink3)"></span></h3>
+    <div class="tools no-print"><div class="fbtns" role="group" aria-label="Filtrar">
+      <button class="fb" type="button" data-f="todos" aria-pressed="true">Todos</button>
+      <button class="fb" type="button" data-f="int" aria-pressed="false">Crédito integral</button>
+      <button class="fb" type="button" data-f="lim" aria-pressed="false">Crédito limitado</button>
+      <button class="fb" type="button" data-f="pend" aria-pressed="false">Pendentes</button>
+      <button class="fb" type="button" data-f="aten" aria-pressed="false">Verificar</button>
+    </div></div>
+    <div class="tbl-wrap"><table id="f-tab"><thead><tr><th>Fornecedor</th><th>CNPJ</th><th>Crédito em 2027</th><th>Simples Nacional</th><th>Opção pelo regime regular (2027)</th><th>Regime em 2027 / observação</th><th class="v">Valor</th><th class="no-print"></th></tr></thead><tbody></tbody></table></div>
+    <div class="btns no-print"><button class="btn sec" type="button" id="f-csv">Exportar (CSV)</button><button class="btn sec" type="button" id="f-print">Imprimir / salvar PDF</button></div>
+    <div class="box plain"><p><strong>Atenção às datas.</strong> Os dados cadastrais vêm da base pública de CNPJ da Receita (atualização periódica, pode ter defasagem de algumas semanas). A opção pelo regime regular do IBS/CBS vale por semestre e pode ser cancelada dentro do prazo do CGSN: reconsulte após o fim do prazo de cancelamento e a cada semestre. O resultado vale para a data da consulta e pressupõe adquirente no regime regular e aquisição que dá direito a crédito.</p></div>
+  </div>
+</section>
+
 <!-- =============================================================== PREMISSAS -->
 <section class="view" id="v-prem" role="tabpanel" aria-labelledby="t-prem" hidden>
   <h2 class="sec">Premissas de 2027</h2>
@@ -280,6 +325,12 @@
       <li>Sem crédito: bens adquiridos com alíquota zero, isenção, sem incidência ou suspensão de PIS/Cofins (CST 06 a 09), uso e consumo, ativo imobilizado, transferências, devoluções e remessas. Em revisão (não somados por padrão): fornecedor do Simples Nacional e CFOP atípico.</li>
       <li>Apropriação até 30/06/2027 e utilização em 12 parcelas mensais iguais a partir do mês de apropriação, somente contra a CBS (Decreto nº 12.955/2026, arts. 605 a 613). Os XMLs são lidos no navegador e não são enviados a servidores.</li>
     </ul>
+    <h3>Fornecedores (crédito em 2027)</h3>
+    <ul>
+      <li>Dados cadastrais (razão social, situação, opção pelo Simples e MEI) consultados pelo navegador do usuário na base pública de CNPJ da Receita (BrasilAPI; reserva: Minha Receita).</li>
+      <li>A opção pelo regime regular do IBS/CBS é confirmada no Consulta Optantes da Receita (“Mais informações” › “Eventos Futuros”), que tem captcha; o site não contorna o captcha — abre a consulta e o usuário registra o resultado, ou importa a planilha da consulta de regime híbrido.</li>
+      <li>Classificação: Simples com opção (híbrido), fora do Simples ou com exclusão agendada → crédito integral; Simples sem opção (ou com opção cancelada) e MEI → crédito limitado ao IBS/CBS pago no DAS.</li>
+    </ul>
     <h3>Serviços e CNAE</h3>
     <p>A NFS-e de 2027 identifica o serviço pela <strong>NBS</strong> (Nomenclatura Brasileira de Serviços), não pelo CNAE — por isso o simulador de nota pede a NBS. Você pode buscar pela descrição do serviço ou pelo item da lista da LC 116 (ex.: <code>17.19</code> para contabilidade).</p>
     <div class="disc">Simulação de caráter estimativo e informativo. Os valores dependem da veracidade e da completude das informações fornecidas, das alíquotas efetivamente fixadas para 2027 e de regulamentação posterior. Não substitui a apuração oficial, a análise do caso concreto nem a orientação de um profissional contábil habilitado.</div>
@@ -306,5 +357,6 @@
 <script src="assets/js/app.js"></script>
 <script src="assets/js/estoque.js"></script>
 <script src="assets/js/estoque-ui.js"></script>
+<script src="assets/js/fornecedores.js"></script>
 </body>
 </html>
