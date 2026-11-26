@@ -1,0 +1,11 @@
+{
+  "name": "calculadora-cbs-ibs-2027-geral",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simulador de CBS e IBS 2027 baseado na Calculadora RTC da Receita Federal",
+  "scripts": {
+    "start": "python3 -m http.server 8765",
+    "test:e2e": "node tests/e2e.js http://localhost:8765/",
+    "test:api": "node tests/compare-api.js && node tests/compare-api-simples.js"
+  }
+}

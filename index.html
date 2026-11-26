@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculadora CBS e IBS 2027</title>
+<meta name="description" content="Simulador de CBS e IBS (Reforma Tributária do Consumo, 2027) baseado na Calculadora RTC oficial da Receita Federal: simulador da empresa, painel do contador e simulador de nota fiscal.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23071D49'/%3E%3Ctext x='16' y='23' font-family='Arial' font-size='20' font-weight='700' fill='%2325B57B' text-anchor='middle'%3E%25%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="page">
+
+<div class="titlebar">
+  <div class="tl">
+    <div class="eyebrow">Reforma Tributária do Consumo · Ano-base 2027</div>
+    <h1>Calculadora CBS e IBS — simulador da empresa, painel do contador e simulação de nota fiscal</h1>
+  </div>
+  <div class="tr">
+    <div><b>Motor de cálculo</b>Calculadora RTC oficial — Receita Federal</div>
+    <div><b>Base de dados</b><span id="meta-base">carregando…</span></div>
+    <div><b>Alíquotas adotadas</b><span id="meta-aliq">CBS 11,3% · IBS 0,1%</span></div>
+  </div>
+</div>
+
+<p class="lede">Simule a CBS e o IBS de 2027 com as mesmas regras de cálculo, tabelas de NCM/NBS, classificações tributárias (cClassTrib) e arredondamento da <strong>Calculadora RTC publicada pela Receita Federal</strong>. Os resultados são <strong>aproximações</strong> e dependem da exatidão das informações fornecidas.</p>
+
+<div class="pad">
+
+<nav class="tabs" role="tablist" aria-label="Funcionalidades">
+  <button class="tab" role="tab" id="t-sim" aria-controls="v-sim" aria-selected="true"><span class="n">1</span>Simulador da empresa</button>
+  <button class="tab" role="tab" id="t-painel" aria-controls="v-painel" aria-selected="false"><span class="n">2</span>Painel do contador</button>
+  <button class="tab" role="tab" id="t-nota" aria-controls="v-nota" aria-selected="false"><span class="n">3</span>Simulador de nota fiscal</button>
+  <button class="tab" role="tab" id="t-prem" aria-controls="v-prem" aria-selected="false"><span class="n">⚙</span>Premissas e metodologia</button>
+</nav>
+
+<div id="loading" class="loading">Carregando as tabelas oficiais da Receita Federal…</div>
+
+<!-- =============================================================== 1. SIMULADOR -->
+<section class="view" id="v-sim" role="tabpanel" aria-labelledby="t-sim" hidden>
+  <h2 class="sec">Simulador da empresa <span class="cnt">estimativa mensal</span></h2>
+  <form id="f-sim" class="card" autocomplete="off" novalidate>
+    <div class="card-h"><span class="sig">Dados da empresa</span><span class="nome">Não informe CNPJ — apenas o nome</span></div>
+    <div class="grid">
+      <div class="field"><label class="req" for="s-nome">Nome da empresa</label><input id="s-nome" name="nome" required maxlength="120" placeholder="Ex.: Comercial Exemplo Ltda."></div>
+      <div class="field"><label class="req" for="s-regime">Regime tributário</label>
+        <select id="s-regime" name="regime">
+          <option value="LP">Lucro Presumido (regime regular de CBS/IBS)</option>
+          <option value="LR">Lucro Real (regime regular de CBS/IBS)</option>
+          <option value="SN">Simples Nacional — padrão (CBS/IBS dentro do DAS)</option>
+          <option value="SNH">Simples Nacional — optante pelo regime regular de CBS/IBS</option>
+        </select>
+        <span class="hint" id="s-regime-hint"></span></div>
+      <div class="field"><label for="s-mes">Mês de referência</label><input id="s-mes" name="mes" type="month" value="2027-01" min="2027-01" max="2027-12"></div>
+    </div>
+
+    <h3 class="sub">Faturamento do mês por tratamento tributário</h3>
+    <p class="hint-bloco">Separe o faturamento conforme a tributação de cada produto ou serviço vendido. <strong>Não sabe separar? Informe tudo em “Tributado integralmente”.</strong></p>
+    <p class="hint-bloco" id="s-sn-nota" hidden>No Simples Nacional padrão, as reduções de alíquota não diminuem o DAS (regra da calculadora oficial do Simples); apenas a faixa “Isento, imune, não tributado ou exportação” fica fora da CBS/IBS.</p>
+    <div class="faixas" id="s-fat" role="group" aria-label="Faturamento por tratamento tributário"></div>
+    <div class="fat-total"><span>Faturamento bruto do mês (soma das faixas)</span><strong id="s-bruto-total">R$ 0,00</strong></div>
+
+    <h3 class="sub">Deduções do faturamento</h3>
+    <div class="grid g3">
+      <div class="field"><label for="s-desc">Descontos e devoluções (R$)</label><input id="s-desc" name="descontos" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Descontos incondicionais e vendas devolvidas.</span></div>
+      <div class="field only-reg"><label for="s-icms">ICMS destacado nas vendas (R$)</label><input id="s-icms" name="icms" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Em 2027 o ICMS (e o FCP) sai da base da CBS/IBS.</span></div>
+      <div class="field only-reg"><label for="s-iss">ISS dos serviços (R$)</label><input id="s-iss" name="iss" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Em 2027 o ISS sai da base da CBS/IBS.</span></div>
+    </div>
+    <p class="hint-bloco">As deduções são distribuídas entre as faixas na proporção do faturamento de cada uma.</p>
+
+    <div class="only-sn" hidden>
+      <h3 class="sub">Simples Nacional</h3>
+      <div class="grid g3">
+        <div class="field"><label class="req" for="s-anexo">Anexo / atividade</label><select id="s-anexo" name="anexo"></select></div>
+        <div class="field"><label for="s-rbt12">Receita bruta dos últimos 12 meses — RBT12 (R$)</label><input id="s-rbt12" name="rbt12" class="num" inputmode="decimal" placeholder="Se vazio: faturamento × 12"></div>
+        <div class="field"><label for="s-pcbs">pCBSSN do PGDAS (%) — opcional</label><input id="s-pcbs" data-pct name="pCBSSN" class="num" inputmode="decimal" placeholder="calculado"><span class="hint">Se você já tem a alíquota efetiva de CBS do PGDAS, informe-a.</span></div>
+        <div class="field"><label for="s-pibs">pIBSSN do PGDAS (%) — opcional</label><input id="s-pibs" data-pct name="pIBSSN" class="num" inputmode="decimal" placeholder="calculado"></div>
+      </div>
+    </div>
+
+    <div class="only-reg">
+      <h3 class="sub">Compras e despesas que geram crédito</h3>
+      <div class="grid g3">
+        <div class="field"><label for="s-cr">Compras de fornecedores do regime regular (R$)</label><input id="s-cr" name="comprasRegular" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Mercadorias, insumos, energia, aluguel e serviços de PJ — valor sem ICMS/ISS.</span></div>
+        <div class="field"><label for="s-cs">Compras de optantes do Simples Nacional (R$)</label><input id="s-cs" name="comprasSimples" class="num" inputmode="decimal" placeholder="0,00"></div>
+        <div class="field"><label for="s-csa">CBS + IBS destacada nas notas do Simples (%)</label><input id="s-csa" data-pct name="aliqCreditoSimples" class="num" inputmode="decimal" placeholder="ex.: 1,20"><span class="hint">O crédito é limitado ao valor destacado (em geral entre 0,6% e 4%).</span></div>
+      </div>
+    </div>
+
+    <div class="btns"><button class="btn" type="submit">Calcular</button><button class="btn sec" type="reset">Limpar</button><span class="msg" id="s-msg" role="alert"></span></div>
+  </form>
+
+  <div id="s-res" class="result" hidden aria-live="polite"></div>
+</section>
+
+<!-- =============================================================== 2. PAINEL -->
+<section class="view" id="v-painel" role="tabpanel" aria-labelledby="t-painel" hidden>
+  <h2 class="sec">Painel do contador <span class="cnt" id="p-cnt">0 clientes</span></h2>
+  <div class="box info no-print"><h2><span class="ic">💡</span>Como usar</h2>
+    <p>Cadastre vários clientes de uma vez — digitando na tabela ou importando uma planilha CSV (colunas: <code>nome;regime;faturamento;deducoes;compras;anexo;rbt12</code>). O cálculo é refeito a cada alteração. Os dados ficam salvos <strong>apenas neste navegador</strong>; nada é enviado para servidores.</p>
+    <p>Regimes aceitos: <code>LP</code> (Lucro Presumido), <code>LR</code> (Lucro Real), <code>SN</code> (Simples padrão) e <code>SNH</code> (Simples optante pelo regime regular). Em <em>Deduções</em>, informe ICMS, ISS, descontos e devoluções do mês.</p>
+  </div>
+  <div class="counts" id="p-counts"></div>
+  <div class="btns no-print">
+    <button class="btn" id="p-add" type="button">+ Adicionar cliente</button>
+    <label class="btn sec" for="p-file" style="font-weight:700">Importar CSV</label><input id="p-file" type="file" accept=".csv,text/csv" hidden>
+    <button class="btn sec" id="p-export" type="button">Exportar resultado (CSV)</button>
+    <button class="btn sec" id="p-modelo" type="button">Baixar modelo CSV</button>
+    <button class="btn sec" id="p-exemplo" type="button">Carregar exemplo</button>
+    <button class="btn sec" id="p-print" type="button">Imprimir / PDF</button>
+    <button class="btn link" id="p-clear" type="button">Limpar tudo</button>
+    <span class="msg" id="p-msg" role="alert"></span>
+  </div>
+  <div class="tbl-wrap">
+    <table class="edit" id="p-tab">
+      <thead><tr>
+        <th>Cliente</th><th>Regime</th><th class="v">Faturamento bruto</th><th class="v">Deduções</th><th class="v">Compras c/ crédito</th><th>Anexo SN</th><th class="v">RBT12 (SN)</th>
+        <th class="v">CBS</th><th class="v">IBS</th><th class="v">Total CBS+IBS</th><th class="v">Carga</th><th class="no-print"></th>
+      </tr></thead>
+      <tbody></tbody>
+      <tfoot></tfoot>
+    </table>
+  </div>
+  <p class="nome" style="font-size:12px;color:var(--ink3)">Regime regular: créditos calculados como se as compras viessem de fornecedores do regime regular com tributação integral. Simples padrão: CBS/IBS embutidas no DAS, sem créditos.</p>
+</section>
+
+<!-- =============================================================== 3. NOTA -->
+<section class="view" id="v-nota" role="tabpanel" aria-labelledby="t-nota" hidden>
+  <h2 class="sec">Simulador de emissão de nota fiscal <span class="cnt">NF-e · NFS-e</span></h2>
+  <form id="f-nota" class="card" autocomplete="off" novalidate>
+    <div class="card-h"><span class="sig">Emitente e produto/serviço</span><span class="nome">Classificação pelas tabelas oficiais de NCM, NBS e cClassTrib</span></div>
+    <div class="grid">
+      <div class="field"><label class="req" for="n-regime">Regime do emitente</label>
+        <select id="n-regime">
+          <option value="LP">Lucro Presumido (regime regular)</option>
+          <option value="LR">Lucro Real (regime regular)</option>
+          <option value="SN">Simples Nacional — padrão (dentro do DAS)</option>
+          <option value="SNH">Simples Nacional — optante pelo regime regular</option>
+        </select></div>
+      <div class="field"><label class="req" for="n-tipo">O que será faturado</label>
+        <select id="n-tipo"><option value="ncm">Produto / mercadoria — NF-e (NCM)</option><option value="nbs">Serviço — NFS-e (NBS)</option></select></div>
+    </div>
+    <div class="grid only-sn-n" hidden style="margin-top:12px">
+      <div class="field"><label class="req" for="n-anexo">Anexo do Simples</label><select id="n-anexo"></select></div>
+      <div class="field"><label for="n-rbt12">RBT12 (R$)</label><input id="n-rbt12" class="num" inputmode="decimal" placeholder="Receita bruta 12 meses"></div>
+      <div class="field"><label for="n-pcbs">pCBSSN do PGDAS (%)</label><input id="n-pcbs" data-pct class="num" inputmode="decimal" placeholder="calculado"></div>
+      <div class="field"><label for="n-pibs">pIBSSN do PGDAS (%)</label><input id="n-pibs" data-pct class="num" inputmode="decimal" placeholder="calculado"></div>
+    </div>
+
+    <div class="grid" style="margin-top:12px">
+      <div class="field wide search"><label class="req" for="n-cod" id="n-cod-lbl">NCM do produto</label>
+        <input id="n-cod" placeholder="Digite o código ou parte da descrição (ex.: 10063021 ou arroz)" aria-autocomplete="list" aria-controls="n-sugg">
+        <div class="sugg" id="n-sugg" role="listbox" hidden></div>
+        <span class="hint" id="n-cod-hint">Use os 8 dígitos do NCM. Pode buscar pela descrição.</span>
+        <div class="path" id="n-path"></div>
+      </div>
+      <div class="field wide only-reg-n"><label for="n-class">Classificação tributária (CST / cClassTrib) — preenchida automaticamente</label>
+        <select id="n-class"><option value="">Informe o NCM/NBS para listar as classificações aplicáveis</option></select>
+        <span class="hint" id="n-class-hint"></span>
+        <div id="n-enq" hidden></div></div>
+    </div>
+
+    <h3 class="sub">Valores da nota</h3>
+    <div class="grid g3" id="n-vals-ncm">
+      <div class="field"><label class="req" for="n-vprod">Valor dos produtos (R$)</label><input id="n-vprod" class="num" inputmode="decimal" placeholder="0,00"></div>
+      <div class="field"><label for="n-vfrete">Frete (R$)</label><input id="n-vfrete" class="num" inputmode="decimal" placeholder="0,00"></div>
+      <div class="field"><label for="n-vseg">Seguro (R$)</label><input id="n-vseg" class="num" inputmode="decimal" placeholder="0,00"></div>
+      <div class="field"><label for="n-voutro">Outras despesas (R$)</label><input id="n-voutro" class="num" inputmode="decimal" placeholder="0,00"></div>
+      <div class="field"><label for="n-vdesc">Desconto incondicional (R$)</label><input id="n-vdesc" class="num" inputmode="decimal" placeholder="0,00"></div>
+      <div class="field only-reg-n"><label for="n-vicms">ICMS + FCP destacados (R$)</label><input id="n-vicms" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Deduzidos da base em 2027.</span></div>
+      <div class="field" id="n-is-f" hidden><label for="n-vis">Imposto Seletivo (R$)</label><input id="n-vis" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Produto sujeito ao IS: o IS integra a base da CBS/IBS.</span></div>
+    </div>
+    <div class="grid g3" id="n-vals-nbs" hidden>
+      <div class="field"><label class="req" for="n-vserv">Valor do serviço (R$)</label><input id="n-vserv" class="num" inputmode="decimal" placeholder="0,00"></div>
+      <div class="field"><label for="n-sdesc">Desconto incondicional (R$)</label><input id="n-sdesc" class="num" inputmode="decimal" placeholder="0,00"></div>
+      <div class="field"><label for="n-sded">Reembolsos e deduções legais (R$)</label><input id="n-sded" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Repasses/ressarcimentos e deduções de base admitidas.</span></div>
+      <div class="field only-reg-n"><label for="n-siss">ISS (R$)</label><input id="n-siss" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Deduzido da base em 2027.</span></div>
+    </div>
+    <div class="btns"><button class="btn" type="submit">Calcular nota</button><button class="btn sec" type="reset">Limpar</button><span class="msg" id="n-msg" role="alert"></span></div>
+  </form>
+  <div id="n-res" class="result" hidden aria-live="polite"></div>
+</section>
+
+<!-- =============================================================== PREMISSAS -->
+<section class="view" id="v-prem" role="tabpanel" aria-labelledby="t-prem" hidden>
+  <h2 class="sec">Premissas de 2027</h2>
+  <form id="f-prem" class="card" novalidate>
+    <div class="card-h"><span class="sig">Alíquotas nominais</span><span class="nome">Aplicadas nas três funcionalidades; ficam salvas neste navegador</span></div>
+    <div class="grid g3">
+      <div class="field"><label for="pr-cbs">CBS (%)</label><input id="pr-cbs" data-pct class="num" inputmode="decimal"></div>
+      <div class="field"><label for="pr-uf">IBS estadual (%)</label><input id="pr-uf" data-pct class="num" inputmode="decimal"></div>
+      <div class="field"><label for="pr-mun">IBS municipal (%)</label><input id="pr-mun" data-pct class="num" inputmode="decimal"></div>
+    </div>
+    <div class="btns"><button class="btn" type="submit">Salvar premissas</button><button class="btn sec" type="button" id="pr-reset">Restaurar padrão (CBS 11,3% · IBS 0,05% + 0,05%)</button><span class="msg" id="pr-msg" role="status"></span></div>
+  </form>
+
+  <div class="method">
+    <h3>Fonte e motor de cálculo</h3>
+    <ul>
+      <li>Regras portadas da <a href="https://github.com/ReceitaFederal/calculadora-rtc-regime-regular" target="_blank" rel="noopener">Calculadora RTC — Regime Regular</a> e da <a href="https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional" target="_blank" rel="noopener">Calculadora RTC — Simples Nacional</a>, publicadas pela Receita Federal (LC 214/2025).</li>
+      <li>Tabelas oficiais extraídas do banco de dados da calculadora (<span id="meta-base2"></span>): classificações tributárias (CST/cClassTrib), percentuais de redução, vínculos NCM/NBS dos anexos da LC 214/2025, NCM, NBS e lista de NCMs sujeitos ao Imposto Seletivo.</li>
+      <li>Fórmulas idênticas às da API oficial: alíquota efetiva = alíquota × (1 − redução); base arredondada a 2 casas; valor = base × alíquota efetiva; arredondamento <em>half-even</em> (ABNT NBR 5891); alíquotas publicadas com 4 casas.</li>
+      <li><strong>Conformidade testada:</strong> o motor do site foi comparado com as duas APIs oficiais executadas localmente — 18.238 combinações de NCM/NBS × cClassTrib (enquadramento) e 6.572 cálculos de valor no regime regular, mais 400 cálculos do Simples Nacional, todos idênticos centavo a centavo.</li>
+    </ul>
+    <h3>Premissas de 2027</h3>
+    <ul>
+      <li><strong>CBS a 11,3%</strong> (alíquota adotada nesta simulação; editável acima). A alíquota oficial de 2027 será fixada por resolução do Senado.</li>
+      <li><strong>IBS a 0,1%</strong> (0,05% estadual + 0,05% municipal), alíquotas de teste de 2027–2028.</li>
+      <li>Base de cálculo 2027: ICMS, FCP e ISS deixam de compor a base da CBS/IBS; PIS e Cofins estão extintos; o Imposto Seletivo integra a base.</li>
+      <li>Simulador da empresa: o faturamento é informado por faixa de tributação (integral e reduções de 30%, 40%, 50%, 60%, 70%, 80% e 100%, além de isento/imune/exportação). Descontos, ICMS e ISS são distribuídos entre as faixas na proporção do faturamento de cada uma.</li>
+      <li>Lucro Real e Lucro Presumido apuram CBS/IBS pelo regime regular (débito − crédito). O regime do IRPJ não altera o cálculo da CBS/IBS; o comparativo com PIS/Cofins de 2026 é apenas referência.</li>
+      <li><strong>Simples Nacional padrão:</strong> CBS e IBS dentro do DAS. A alíquota efetiva vem das tabelas da LC 123/2006 (faixa pela RBT12); a parcela antes destinada a PIS/Cofins passa a CBS + IBS. A divisão CBS × IBS é estimada (IBS ≈ 1,1% dessa parcela, arredondado), reproduzindo as tabelas de 2027 divulgadas. Quando disponível, informe o pCBSSN/pIBSSN do PGDAS.</li>
+      <li><strong>Simples optante pelo regime regular:</strong> o DAS deixa de incluir CBS/IBS, que passam a ser apurados como no regime regular, com créditos.</li>
+      <li>Não estão no escopo: tributação monofásica de combustíveis, regimes específicos (financeiro, planos de saúde, imóveis com alíquota fixa), suspensões aduaneiras e ajustes.</li>
+    </ul>
+    <h3>Serviços e CNAE</h3>
+    <p>A NFS-e de 2027 identifica o serviço pela <strong>NBS</strong> (Nomenclatura Brasileira de Serviços), não pelo CNAE — por isso o simulador de nota pede a NBS. Você pode buscar pela descrição do serviço ou pelo item da lista da LC 116 (ex.: <code>17.19</code> para contabilidade).</p>
+    <div class="disc">Simulação de caráter estimativo e informativo. Os valores dependem da veracidade e da completude das informações fornecidas, das alíquotas efetivamente fixadas para 2027 e de regulamentação posterior. Não substitui a apuração oficial, a análise do caso concreto nem a orientação de um profissional contábil habilitado.</div>
+  </div>
+</section>
+
+<div class="box alert" style="margin-top:28px"><h2><span class="ic">⚖️</span>Aviso legal</h2>
+  <p>Os valores apresentados são <strong>aproximações</strong> calculadas a partir das informações digitadas pelo usuário e das regras e tabelas da Calculadora RTC da Receita Federal vigentes na data de referência. O resultado depende da <strong>veracidade e da exatidão</strong> dos dados informados, das alíquotas efetivamente fixadas para 2027 e de regulamentação posterior. A simulação não constitui parecer, consulta formal nem apuração oficial, e não substitui a análise do caso concreto por profissional habilitado. Os autores não se responsabilizam por decisões tomadas exclusivamente com base nesta ferramenta.</p>
+</div>
+
+</div><!-- /pad -->
+
+<footer class="institucional">
+  <div class="addr">Simulador baseado na Calculadora RTC da Receita Federal (código aberto, licença MIT). Resultados aproximados — não substituem a apuração oficial.</div>
+  <div class="rule"></div>
+  <div class="row">
+    <div class="aud">REFORMA TRIBUTÁRIA DO CONSUMO · 2027</div>
+    <div class="site"><a href="https://github.com/michellemarcondes/Reforma-Tributaria-2027-geral" target="_blank" rel="noopener" style="text-decoration:none">Código-fonte no <b>GitHub</b></a></div>
+  </div>
+</footer>
+
+</div><!-- /page -->
+<script src="assets/js/engine.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
