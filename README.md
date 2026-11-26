@@ -30,6 +30,14 @@ Site estático (HTML/CSS/JS, sem servidor) para simular a **CBS** e o **IBS** de
 
 Campos numéricos aceitam qualquer formato: 2000, 2.000, 2.000,00, 2000,5 ou 1,234.56.
 
+4. **Crédito de estoque** — crédito presumido de CBS sobre o estoque de abertura de 2027 (art. 381 da
+   LC 214/2025). A pessoa envia os XMLs das notas de compra (arquivos, pasta inteira ou .zip, sem
+   limite; lidos no próprio navegador). O site separa o que gera crédito (revenda/insumo, ST e
+   monofásico, importação) do que não gera (alíquota zero/isenção/suspensão, uso e consumo,
+   imobilizado, transferência, devolução, remessa, notas canceladas e duplicadas), calcula 9,25% sobre o
+   custo de aquisição do estoque, permite ajustar o inventário de 31/12/2026 (item a item, por % ou
+   importando CSV) e monta o cronograma das 12 parcelas a partir do mês de apropriação (até junho/2027).
+
 Premissas padrão (editáveis na aba *Premissas*): **CBS 11,3%**, **IBS 0,05% estadual + 0,05% municipal**.
 
 ## Como o cálculo foi portado e validado
@@ -46,6 +54,9 @@ Premissas padrão (editáveis na aba *Premissas*): **CBS 11,3%**, **IBS 0,05% es
     **6.572** cálculos de valor idênticos (centavo a centavo);
   - Simples Nacional: **400** cálculos idênticos.
 - `tests/e2e.js` testa as três funcionalidades no navegador (Playwright), inclusive em celular.
+- Crédito de estoque: `node tests/gerar-xmls-teste.js /tmp/xmls` gera NF-e de exemplo (revenda, ST,
+  alíquota zero, Simples, imobilizado, transferência, devolução, cancelada, duplicada, importação,
+  ISO-8859-1 e .zip); `tests/estoque.test.js` confere o motor e `tests/e2e-estoque.js` a aba no navegador.
 
 ### Rodar localmente
 

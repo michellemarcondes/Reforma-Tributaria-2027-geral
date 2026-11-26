@@ -31,6 +31,7 @@
   <button class="tab" role="tab" id="t-sim" aria-controls="v-sim" aria-selected="true"><span class="n">1</span>Simulador da empresa</button>
   <button class="tab" role="tab" id="t-painel" aria-controls="v-painel" aria-selected="false"><span class="n">2</span>Painel do contador</button>
   <button class="tab" role="tab" id="t-nota" aria-controls="v-nota" aria-selected="false"><span class="n">3</span>Simulador de nota fiscal</button>
+  <button class="tab" role="tab" id="t-estoque" aria-controls="v-estoque" aria-selected="false"><span class="n">4</span>Crédito de estoque</button>
   <button class="tab" role="tab" id="t-prem" aria-controls="v-prem" aria-selected="false"><span class="n">⚙</span>Premissas e metodologia</button>
 </nav>
 
@@ -181,6 +182,65 @@
   <div id="n-res" class="result" hidden aria-live="polite"></div>
 </section>
 
+<!-- =============================================================== 4. CREDITO DE ESTOQUE -->
+<section class="view" id="v-estoque" role="tabpanel" aria-labelledby="t-estoque" hidden>
+  <h2 class="sec">Crédito presumido de CBS sobre o estoque de abertura <span class="cnt">art. 381 · LC 214/2025</span></h2>
+  <div class="box info"><h2><span class="ic">📦</span>Como funciona</h2>
+    <p>Empresas que em 2026 estão no <strong>regime cumulativo do PIS/Cofins (Lucro Presumido)</strong> podem apropriar um <strong>crédito presumido de CBS de 9,25%</strong> sobre o custo de aquisição dos bens em estoque em <strong>1º/01/2027</strong>. O crédito depende do <strong>inventário de 31/12/2026</strong>, deve ser apropriado <strong>até 30/06/2027</strong> e é utilizado em <strong>12 parcelas mensais iguais</strong>, somente para abater a própria CBS. No Lucro Real, o crédito alcança apenas os bens adquiridos com PIS/Cofins monofásico ou por substituição tributária.</p>
+    <p>Envie os XMLs das notas de compra dos produtos que estão em estoque. O site lê cada nota, separa o que dá crédito e o que não dá, e monta o cálculo e o cronograma.</p>
+  </div>
+
+  <form id="f-est" class="card" autocomplete="off" novalidate>
+    <div class="card-h"><span class="sig">1. Empresa e premissas</span><span class="nome">Os dados da empresa são detectados nos XMLs; ajuste se necessário</span></div>
+    <div class="grid">
+      <div class="field"><label for="e-nome">Nome da empresa</label><input id="e-nome" maxlength="120" placeholder="Preenchido pelos XMLs"></div>
+      <div class="field"><label for="e-cnpj">CNPJ da empresa (destinatário das notas)</label><input id="e-cnpj" inputmode="numeric" placeholder="Detectado automaticamente"><span class="hint">Usado só para separar compras de vendas; não é enviado a lugar algum.</span></div>
+      <div class="field"><label for="e-regime">Regime de PIS/Cofins em 2026</label>
+        <select id="e-regime"><option value="LP">Lucro Presumido — cumulativo (todo o estoque elegível)</option><option value="LR">Lucro Real — não cumulativo (só monofásico/ST)</option></select></div>
+      <div class="field"><label for="e-mes">Mês de apropriação do crédito</label>
+        <select id="e-mes"><option value="1">Janeiro/2027</option><option value="2">Fevereiro/2027</option><option value="3">Março/2027</option><option value="4">Abril/2027</option><option value="5">Maio/2027</option><option value="6">Junho/2027 (prazo final)</option></select>
+        <span class="hint">As 12 parcelas começam neste mês.</span></div>
+      <div class="field"><label for="e-aliq">Alíquota do crédito presumido (%)</label><input id="e-aliq" data-pct class="num" inputmode="decimal" value="9,25"></div>
+      <div class="field"><label for="e-outros">Outros estoques sem XML (R$)</label><input id="e-outros" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Custo de bens elegíveis em estoque cujas notas não foram enviadas.</span></div>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="e-icms" checked> Excluir do custo o ICMS destacado (ICMS recuperável)</label>
+      <label><input type="checkbox" id="e-ipi" checked> Incluir o IPI no custo (empresa que não credita IPI)</label>
+      <label><input type="checkbox" id="e-st" checked> Incluir o ICMS-ST no custo</label>
+      <label><input type="checkbox" id="e-rev"> Somar os itens “em revisão” (fornecedor do Simples, CFOP atípico)</label>
+    </div>
+  </form>
+
+  <div class="card">
+    <div class="card-h"><span class="sig">2. Notas fiscais de compra (XML)</span><span class="nome">Sem limite de quantidade · aceita .xml e .zip</span></div>
+    <div class="drop" id="e-drop" tabindex="0" role="button" aria-label="Selecionar ou arrastar arquivos XML ou ZIP">
+      <div class="drop-ic" aria-hidden="true">⇪</div>
+      <div><strong>Arraste aqui os XMLs ou arquivos .zip</strong><br><span>ou use os botões abaixo. Os arquivos são lidos no seu navegador — nada é enviado para servidores.</span></div>
+    </div>
+    <div class="btns">
+      <label class="btn" for="e-files">Selecionar arquivos</label><input id="e-files" type="file" accept=".xml,.zip,application/zip,text/xml" multiple hidden>
+      <label class="btn sec" for="e-dir">Selecionar pasta</label><input id="e-dir" type="file" webkitdirectory multiple hidden>
+      <button class="btn link" type="button" id="e-limpar">Limpar notas</button>
+      <span class="msg" id="e-msg" role="status"></span>
+    </div>
+    <div class="prog" id="e-prog" hidden><div class="bar"><span id="e-bar"></span></div><span id="e-prog-txt"></span></div>
+    <div id="e-lidos" class="hint-bloco"></div>
+  </div>
+
+  <div class="card" id="e-inv-card" hidden>
+    <div class="card-h"><span class="sig">3. Inventário em 31/12/2026</span><span class="nome">Quanto do que foi comprado ainda estava em estoque</span></div>
+    <p class="hint-bloco">Por padrão, o site considera que <strong>toda a quantidade comprada</strong> nas notas enviadas ainda estava em estoque. Ajuste item a item na tabela abaixo, aplique um percentual geral ou importe o inventário (CSV com <code>codigo;quantidade</code> ou <code>descricao;quantidade</code> — itens que não constarem do inventário ficam com quantidade zero).</p>
+    <div class="btns">
+      <span class="inline-field"><label for="e-pct">% ainda em estoque</label><input id="e-pct" data-pct class="num" inputmode="decimal" placeholder="100"></span>
+      <button class="btn sec" type="button" id="e-pct-ap">Aplicar a todos</button>
+      <label class="btn sec" for="e-inv">Importar inventário (CSV)</label><input id="e-inv" type="file" accept=".csv,text/csv,.txt" hidden>
+      <button class="btn sec" type="button" id="e-inv-mod">Baixar modelo do inventário</button>
+    </div>
+  </div>
+
+  <div id="e-res" class="result" hidden aria-live="polite"></div>
+</section>
+
 <!-- =============================================================== PREMISSAS -->
 <section class="view" id="v-prem" role="tabpanel" aria-labelledby="t-prem" hidden>
   <h2 class="sec">Premissas de 2027</h2>
@@ -213,6 +273,13 @@
       <li><strong>Simples optante pelo regime regular:</strong> o DAS deixa de incluir CBS/IBS, que passam a ser apurados como no regime regular, com créditos.</li>
       <li>Não estão no escopo: tributação monofásica de combustíveis, regimes específicos (financeiro, planos de saúde, imóveis com alíquota fixa), suspensões aduaneiras e ajustes.</li>
     </ul>
+    <h3>Crédito de estoque (art. 381 da LC 214/2025)</h3>
+    <ul>
+      <li>Crédito presumido de CBS de 9,25% sobre o custo de aquisição dos bens em estoque em 1º/01/2027 (inventário de 31/12/2026), para quem estava no regime cumulativo do PIS/Cofins; no Lucro Real, apenas bens adquiridos com PIS/Cofins monofásico ou por substituição tributária. Nos importados, o crédito é o PIS/Cofins-Importação pago.</li>
+      <li>Custo de aquisição por item: produto − desconto + frete + seguro + outras despesas + IPI + ICMS-ST + II − ICMS recuperável (opções editáveis). O custo unitário é a média das compras enviadas; a quantidade em estoque é editável (padrão: toda a quantidade comprada).</li>
+      <li>Sem crédito: bens adquiridos com alíquota zero, isenção, sem incidência ou suspensão de PIS/Cofins (CST 06 a 09), uso e consumo, ativo imobilizado, transferências, devoluções e remessas. Em revisão (não somados por padrão): fornecedor do Simples Nacional e CFOP atípico.</li>
+      <li>Apropriação até 30/06/2027 e utilização em 12 parcelas mensais iguais a partir do mês de apropriação, somente contra a CBS (Decreto nº 12.955/2026, arts. 605 a 613). Os XMLs são lidos no navegador e não são enviados a servidores.</li>
+    </ul>
     <h3>Serviços e CNAE</h3>
     <p>A NFS-e de 2027 identifica o serviço pela <strong>NBS</strong> (Nomenclatura Brasileira de Serviços), não pelo CNAE — por isso o simulador de nota pede a NBS. Você pode buscar pela descrição do serviço ou pelo item da lista da LC 116 (ex.: <code>17.19</code> para contabilidade).</p>
     <div class="disc">Simulação de caráter estimativo e informativo. Os valores dependem da veracidade e da completude das informações fornecidas, das alíquotas efetivamente fixadas para 2027 e de regulamentação posterior. Não substitui a apuração oficial, a análise do caso concreto nem a orientação de um profissional contábil habilitado.</div>
@@ -237,5 +304,7 @@
 </div><!-- /page -->
 <script src="assets/js/engine.js"></script>
 <script src="assets/js/app.js"></script>
+<script src="assets/js/estoque.js"></script>
+<script src="assets/js/estoque-ui.js"></script>
 </body>
 </html>
