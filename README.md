@@ -23,7 +23,12 @@ Site estático (HTML/CSS/JS, sem servidor) para simular a **CBS** e o **IBS** de
 2. **Painel do contador** — vários clientes de uma vez (digitação ou importação de CSV),
    recálculo instantâneo, totais da carteira, exportação do resultado em CSV e impressão/PDF.
    Os dados ficam somente no navegador (localStorage).
-3. **Simulador de nota fiscal** — valor da nota, NCM (NF-e) ou NBS (NFS-e) com busca por código,
+3. **Simulador de nota fiscal** — **a partir do XML de uma NF-e de hoje**: retira do preço o ICMS (+FCP)
+   destacado e o PIS/Cofins pelas alíquotas da empresa (regime sugerido pelo XML; CST monofásico/alíquota
+   zero sem PIS/Cofins), e o IPI e o ICMS-ST cobrados por fora, chegando ao **valor líquido** que a empresa
+   recebe; sobre ele calcula a CBS e o IBS de 2027 por fora (classificação automática pelo NCM) e o ICMS por
+   dentro com a alíquota do XML, em dois cenários — CBS/IBS **compondo ou não a base do ICMS** (opção
+   marcável; hoje compõem em todos os estados). Ou, manualmente: valor da nota, NCM (NF-e) ou NBS (NFS-e) com busca por código,
    descrição ou item da LC 116. O enquadramento é **automático**: o site identifica, pelas tabelas
    oficiais (anexos da LC 214/2025 e correlação NBS × cClassTrib), se o código tem redução de 100%,
    60%, 40%, 30% etc. e já calcula a CBS, o IBS estadual e o IBS municipal com essa redução.
@@ -77,6 +82,9 @@ Premissas padrão (editáveis na aba *Premissas*): **CBS 11,3%**, **IBS 0,05% es
 - Crédito de estoque: `node tests/gerar-xmls-teste.js /tmp/xmls` gera NF-e de exemplo (revenda, ST,
   alíquota zero, Simples, imobilizado, transferência, devolução, cancelada, duplicada, importação,
   ISO-8859-1 e .zip); `tests/estoque.test.js` confere o motor e `tests/e2e-estoque.js` a aba no navegador.
+- Nota pelo XML: `node tests/gerar-nfe-2026.js /tmp/nfe` gera NF-e de Lucro Presumido (notebook com IPI,
+  arroz com redução de base do ICMS, medicamento com ST) e do Simples; `tests/nota-xml.test.js` confere o
+  cálculo contra contas feitas à mão e `tests/e2e-nota-xml.js` a tela no navegador.
 - Melhor regime: `node tests/gerar-sped-teste.js /tmp/sped` gera 12 meses de EFD ICMS/IPI e EFD Contribuições,
   ECD e balancete de uma empresa fictícia; `tests/regime.test.js` confere o motor contra contas feitas à mão e
   `tests/e2e-regime.js` a aba no navegador.

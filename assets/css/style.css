@@ -124,6 +124,10 @@ table.mem td:first-child{width:62%}
 .drop:hover,.drop:focus,.drop.on{background:#EAF3FB;border-color:var(--navy);outline:none}
 .drop .drop-ic{font-size:30px;color:var(--blue-md);line-height:1}
 .drop span{font-size:12.5px;color:var(--ink3)}
+td.v.sel{background:#EEF6FB;font-weight:600}
+#nx-card .intro{font-size:13.5px;color:var(--ink2);margin:0 0 12px}
+#nx-itens small{color:var(--ink3);font-size:11px;white-space:nowrap}
+#nx-itens td,#nx-itens th{padding-left:8px;padding-right:8px}
 .prog{display:flex;align-items:center;gap:12px;margin:8px 0;font-size:12.5px;color:var(--ink2)}
 .prog .bar{flex:1;height:8px;background:#E6E9ED;border-radius:4px;overflow:hidden}
 .prog .bar span{display:block;height:100%;width:0;background:var(--green);transition:width .2s}

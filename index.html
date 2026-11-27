@@ -137,6 +137,62 @@
 <!-- =============================================================== 3. NOTA -->
 <section class="view" id="v-nota" role="tabpanel" aria-labelledby="t-nota" hidden>
   <h2 class="sec">Simulador de emissão de nota fiscal <span class="cnt">NF-e · NFS-e</span></h2>
+  <div class="card" id="nx-card">
+    <div class="card-h"><span class="sig">A partir do XML de uma nota de hoje</span><span class="nome">Retira os tributos embutidos e recalcula a nota em 2027</span></div>
+    <p class="intro">Envie o XML de uma NF-e emitida em 2026. O site retira do preço o <strong>ICMS</strong>, o <strong>PIS</strong> e a <strong>Cofins</strong> (embutidos) e o <strong>IPI</strong> e o <strong>ICMS-ST</strong> (cobrados por fora), chega ao <strong>valor líquido</strong> — o que a empresa efetivamente recebe — e, a partir dele, calcula a <strong>CBS</strong>, o <strong>IBS</strong> e o <strong>ICMS</strong> de 2027.</p>
+    <div class="drop" id="nx-drop" tabindex="0" role="button" aria-label="Selecionar ou arrastar o XML da nota">
+      <div class="drop-ic" aria-hidden="true">⇪</div>
+      <div><strong>Arraste aqui o XML da NF-e</strong><br><span>ou clique para selecionar. O arquivo é lido no seu navegador — nada é enviado para servidores.</span></div>
+    </div>
+    <input id="nx-file" type="file" accept=".xml,text/xml" hidden>
+    <span class="msg" id="nx-msg" role="status"></span>
+    <div id="nx-opc" hidden>
+      <div class="grid" style="margin-top:14px">
+        <div class="field"><label for="nx-regime">Regime de PIS/Cofins do emitente (2026)</label>
+          <select id="nx-regime"><option value="LP">Lucro Presumido — PIS 0,65% · Cofins 3%</option><option value="LR">Lucro Real — PIS 1,65% · Cofins 7,6%</option><option value="SN">Simples Nacional (informe o embutido no DAS)</option><option value="INF">Alíquotas informadas</option></select>
+          <span class="hint">Sugerido pelo XML (CRT e alíquota de PIS dos itens).</span></div>
+        <div class="field"><label for="nx-pis">Alíquota de PIS (%)</label><input id="nx-pis" class="num" data-pct inputmode="decimal"></div>
+        <div class="field"><label for="nx-cofins">Alíquota de Cofins (%)</label><input id="nx-cofins" class="num" data-pct inputmode="decimal"></div>
+        <div class="field"><label>Estado da operação (ICMS)</label><div class="path" id="nx-uf" style="font-size:15px;font-weight:600"></div><span class="hint">A alíquota de ICMS de cada item vem do XML.</span></div>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="nx-base" checked> Em 2027, a CBS e o IBS compõem a base de cálculo do ICMS no estado da nota</label>
+        <label><input type="checkbox" id="nx-tema69" checked> PIS/Cofins calculados sem o ICMS na base (Tema 69 do STF)</label>
+        <label><input type="checkbox" id="nx-ipi"> Manter o IPI em 2027 (industrialização incentivada na Zona Franca de Manaus)</label>
+      </div>
+      <p class="hint" style="margin:6px 0 0">Hoje a CBS e o IBS entram na base do ICMS em todos os estados. Desmarque a primeira opção para ver o cenário em que o estado os exclui — a tabela mostra os dois.</p>
+    </div>
+  </div>
+  <div id="nx-res" class="result" hidden aria-live="polite"></div>
+  <h3 class="sub" style="margin-top:22px">Ou simule uma nota manualmente</h3>
+  <div class="card" id="nx-card">
+    <div class="card-h"><span class="sig">A partir do XML de uma nota de hoje</span><span class="nome">Retira os tributos embutidos e recalcula a nota em 2027</span></div>
+    <p class="intro">Envie o XML de uma NF-e emitida em 2026. O site retira do preço o <strong>ICMS</strong>, o <strong>PIS</strong> e a <strong>Cofins</strong> (embutidos) e o <strong>IPI</strong> e o <strong>ICMS-ST</strong> (cobrados por fora), chega ao <strong>valor líquido</strong> — o que a empresa efetivamente recebe — e, a partir dele, calcula a <strong>CBS</strong>, o <strong>IBS</strong> e o <strong>ICMS</strong> de 2027.</p>
+    <div class="drop" id="nx-drop" tabindex="0" role="button" aria-label="Selecionar ou arrastar o XML da nota">
+      <div class="drop-ic" aria-hidden="true">⇪</div>
+      <div><strong>Arraste aqui o XML da NF-e</strong><br><span>ou clique para selecionar. O arquivo é lido no seu navegador — nada é enviado para servidores.</span></div>
+    </div>
+    <input id="nx-file" type="file" accept=".xml,text/xml" hidden>
+    <span class="msg" id="nx-msg" role="status"></span>
+    <div id="nx-opc" hidden>
+      <div class="grid" style="margin-top:14px">
+        <div class="field"><label for="nx-regime">Regime de PIS/Cofins do emitente (2026)</label>
+          <select id="nx-regime"><option value="LP">Lucro Presumido — PIS 0,65% · Cofins 3%</option><option value="LR">Lucro Real — PIS 1,65% · Cofins 7,6%</option><option value="SN">Simples Nacional (informe o embutido no DAS)</option><option value="INF">Alíquotas informadas</option></select>
+          <span class="hint">Sugerido pelo XML (CRT e alíquota de PIS dos itens).</span></div>
+        <div class="field"><label for="nx-pis">Alíquota de PIS (%)</label><input id="nx-pis" class="num" data-pct inputmode="decimal"></div>
+        <div class="field"><label for="nx-cofins">Alíquota de Cofins (%)</label><input id="nx-cofins" class="num" data-pct inputmode="decimal"></div>
+        <div class="field"><label>Estado da operação (ICMS)</label><div class="path" id="nx-uf" style="font-size:15px;font-weight:600"></div><span class="hint">A alíquota de ICMS de cada item vem do XML.</span></div>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="nx-base" checked> Em 2027, a CBS e o IBS compõem a base de cálculo do ICMS no estado da nota</label>
+        <label><input type="checkbox" id="nx-tema69" checked> PIS/Cofins calculados sem o ICMS na base (Tema 69 do STF)</label>
+        <label><input type="checkbox" id="nx-ipi"> Manter o IPI em 2027 (industrialização incentivada na Zona Franca de Manaus)</label>
+      </div>
+      <p class="hint" style="margin:6px 0 0">Hoje a CBS e o IBS entram na base do ICMS em todos os estados. Desmarque a primeira opção para ver o cenário em que o estado os exclui — a tabela mostra os dois.</p>
+    </div>
+  </div>
+  <div id="nx-res" class="result" hidden aria-live="polite"></div>
+  <h3 class="sub" style="margin-top:22px">Ou simule uma nota manualmente</h3>
   <form id="f-nota" class="card" autocomplete="off" novalidate>
     <div class="card-h"><span class="sig">Emitente e produto/serviço</span><span class="nome">Classificação pelas tabelas oficiais de NCM, NBS e cClassTrib</span></div>
     <div class="grid">
@@ -386,6 +442,7 @@
       <li><strong>CBS a 11,3%</strong> (alíquota adotada nesta simulação; editável acima). A alíquota oficial de 2027 será fixada por resolução do Senado.</li>
       <li><strong>IBS a 0,1%</strong> (0,05% estadual + 0,05% municipal), alíquotas de teste de 2027–2028.</li>
       <li>Base de cálculo 2027: ICMS, FCP e ISS deixam de compor a base da CBS/IBS; PIS e Cofins estão extintos; o Imposto Seletivo integra a base.</li>
+      <li>Simulador de nota pelo XML: valor líquido = produtos + frete + seguro + outras despesas − desconto − ICMS/FCP destacado − PIS − Cofins (alíquotas da empresa, sobre o valor sem ICMS pelo Tema 69 do STF, se marcado; CST 04 a 09 sem PIS/Cofins); IPI e ICMS-ST, cobrados por fora, também saem do total. Em 2027: CBS/IBS = valor líquido × alíquota efetiva do NCM (por fora); ICMS = alíquota × (valor líquido + CBS + IBS) ÷ (1 − alíquota) quando a CBS e o IBS compõem a base do ICMS, ou alíquota × valor líquido ÷ (1 − alíquota) quando não compõem; IPI zero (exceto ZFM, se marcado); ICMS-ST mantido.</li>
       <li>Simulador da empresa: o faturamento e as devoluções são informados por faixa de tributação (cada devolução abate a sua própria faixa) ou preenchidos pela EFD ICMS/IPI e EFD Contribuições de 2026, com cada venda e devolução classificada pelo NCM/NBS como seria tributada em 2027 (média mensal). Faixas (integral e reduções de 30%, 40%, 50%, 60%, 70%, 80% e 100%, além de isento/imune/exportação). Descontos, ICMS e ISS são distribuídos entre as faixas na proporção do faturamento de cada uma.</li>
       <li>Lucro Real e Lucro Presumido apuram CBS/IBS pelo regime regular (débito − crédito). O regime do IRPJ não altera o cálculo da CBS/IBS; o comparativo com PIS/Cofins de 2026 é apenas referência.</li>
       <li><strong>Simples Nacional padrão:</strong> CBS e IBS dentro do DAS. A alíquota efetiva vem das tabelas da LC 123/2006 (faixa pela RBT12); a parcela antes destinada a PIS/Cofins passa a CBS + IBS. A divisão CBS × IBS é estimada (IBS ≈ 1,1% dessa parcela, arredondado), reproduzindo as tabelas de 2027 divulgadas. Quando disponível, informe o pCBSSN/pIBSSN do PGDAS.</li>
@@ -440,5 +497,7 @@
 <script src="assets/js/estoque-ui.js"></script>
 <script src="assets/js/fornecedores.js"></script>
 <script src="assets/js/regime.js"></script>
+<script src="assets/js/nota-xml.js"></script>
+<script src="assets/js/nota-xml.js"></script>
 </body>
 </html>
