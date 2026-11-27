@@ -45,6 +45,14 @@ Campos numéricos aceitam qualquer formato: 2000, 2.000, 2.000,00, 2000,5 ou 1,2
    captcha; o site abre a consulta) ou importada da planilha gerada pela consulta de regime híbrido.
    Resultado: crédito integral × limitado ao DAS, com resumo por quantidade e valor e exportação CSV.
 
+6. **Melhor regime 2027** — comparativo Lucro Presumido × Lucro Real × Simples Nacional (padrão e
+   híbrido). Lê, no navegador, 12 meses de EFD ICMS/IPI e EFD Contribuições e a ECD ou balancetes
+   (CSV/XLSX), soltos ou em .zip; identifica os benefícios da LC 214/2025 por NCM e por serviço
+   (LC 116 → NBS), calcula a CBS/IBS com créditos, monta a DRE (editável) e calcula IRPJ/CSLL
+   (presunção trimestral com a LC 224/2025; lucro real com LALUR e prejuízo até 30%), INSS patronal,
+   ICMS/ISS e DAS (sublimite, Fator R, Anexo IV). Relatório com ranking, economia frente ao regime
+   atual, margem real × ponto de equilíbrio, alerta de vendas B2B, prazos de opção e fontes.
+
 Premissas padrão (editáveis na aba *Premissas*): **CBS 11,3%**, **IBS 0,05% estadual + 0,05% municipal**.
 
 ## Como o cálculo foi portado e validado
@@ -64,6 +72,9 @@ Premissas padrão (editáveis na aba *Premissas*): **CBS 11,3%**, **IBS 0,05% es
 - Crédito de estoque: `node tests/gerar-xmls-teste.js /tmp/xmls` gera NF-e de exemplo (revenda, ST,
   alíquota zero, Simples, imobilizado, transferência, devolução, cancelada, duplicada, importação,
   ISO-8859-1 e .zip); `tests/estoque.test.js` confere o motor e `tests/e2e-estoque.js` a aba no navegador.
+- Melhor regime: `node tests/gerar-sped-teste.js /tmp/sped` gera 12 meses de EFD ICMS/IPI e EFD Contribuições,
+  ECD e balancete de uma empresa fictícia; `tests/regime.test.js` confere o motor contra contas feitas à mão e
+  `tests/e2e-regime.js` a aba no navegador.
 - Fornecedores: `tests/fornecedores.test.js <planilha.xlsx> [--rede]` (validação de CNPJ, leitura da lista,
   classificação, leitura do .xlsx da consulta de regime híbrido, fonte reserva e, com `--rede`, consulta real)
   e `tests/e2e-fornecedores.js` (aba no navegador, com respostas simuladas da BrasilAPI).

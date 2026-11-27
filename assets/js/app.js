@@ -72,7 +72,7 @@
   }
 
   // ------------------------------------------------------------------ abas
-  var TABS = { sim: 'simulador', painel: 'painel', nota: 'nota', estoque: 'credito-estoque', fornec: 'fornecedores', prem: 'premissas' };
+  var TABS = { sim: 'simulador', painel: 'painel', nota: 'nota', estoque: 'credito-estoque', fornec: 'fornecedores', regime: 'melhor-regime', prem: 'premissas' };
   function abrir(id, push) {
     $$('.tab').forEach(function (t) { t.setAttribute('aria-selected', String(t.id === 't-' + id)); });
     $$('section.view').forEach(function (v) { v.hidden = v.id !== 'v-' + id; });
@@ -472,26 +472,9 @@
     $('#n-is-f').hidden = !(tipo === 'ncm' && R.sujeitoIS(IDX, c));
   }
   // Beneficios que dependem de condicao do adquirente ou da operacao nao sao aplicados automaticamente.
-  var CONDICIONAL = /administra[cç][aã]o p[uú]blica|[oó]rg[aã]os|entidades de sa[uú]de imunes|emerg[eê]ncia|soberania|diferimento|produtor rural|Programa Universidade|Institui[cç][aã]o Cient[ií]fica|cooperativ|zonas reabilitadas|reabilita[cç][aã]o urbana|projetos incentivados|Zona Franca|livre com[eé]rcio/i;
-  function reducaoMedia(x) { var r = x.red || {}; return (Number(r.cbs || 0) + Number(r.ibsUf || 0) + Number(r.ibsMun || 0)) / 3; }
-  function enquadrar(tipo, c) {
-    var ap = R.classificacoesPara(IDX, tipo, c);
-    var sug = tipo === 'nbs' && DATA.nbsSug[c] ? DATA.nbsSug[c] : null;
-    var esp = ap.especificas.slice();
-    if (sug) sug.c.forEach(function (cc) { var o = IDX.porCodigo[cc]; if (o && cc !== '000001' && esp.indexOf(o) < 0 && ap.gerais.indexOf(o) >= 0) esp.push(o); });
-    var integral = IDX.porCodigo['000001'];
-    // candidatos automaticos: anexo da LC 214 (NCM/NBS) ou correlacao oficial NBS -> cClassTrib
-    var cand = esp.filter(function (x) { return !CONDICIONAL.test(x.d) && !x.dif && x.gIBSCBS; });
-    if (sug && sug.c.indexOf('000001') >= 0) cand = cand.filter(function (x) { return ap.especificas.indexOf(x) >= 0; }); // NBS com tributacao integral prevista
-    cand.sort(function (a, b) { return reducaoMedia(b) - reducaoMedia(a); });
-    var escolhida = cand[0] || integral;
-    var outras = ap.gerais.filter(function (x) { return x.c !== '000001' && esp.indexOf(x) < 0; });
-    var motivo;
-    if (escolhida === integral) motivo = esp.length ? 'Os tratamentos vinculados a este código dependem de condições específicas (ex.: venda a órgão público, diferimento). Aplicada a tributação integral — altere se a operação se enquadrar.' : 'Nenhuma redução ou isenção vinculada a este código nas tabelas oficiais da Receita.';
-    else if (ap.especificas.indexOf(escolhida) >= 0) motivo = 'O código consta do anexo da LC 214/2025 vinculado a esta classificação nas tabelas oficiais da Receita.';
-    else motivo = 'Classificação indicada pela correlação oficial NBS × LC 116 × cClassTrib da NFS-e.';
-    return { integral: integral, especificas: esp, outras: outras, escolhida: escolhida, motivo: motivo, lc: sug ? sug.lc : [] };
-  }
+  // enquadramento automatico: regra unica no motor (engine.js), usada tambem pela aba de regime
+  function reducaoMedia(x) { return R.reducaoMedia(x); }
+  function enquadrar(tipo, c) { return R.enquadrar(IDX, tipo, c); }
   function rotuloTratamento(x) {
     if (!x.gIBSCBS) return { t: 'Sem incidência de CBS/IBS', cls: 'g' };
     if (x.dif) return { t: 'Diferimento', cls: '' };

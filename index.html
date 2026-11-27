@@ -33,6 +33,7 @@
   <button class="tab" role="tab" id="t-nota" aria-controls="v-nota" aria-selected="false"><span class="n">3</span>Simulador de nota fiscal</button>
   <button class="tab" role="tab" id="t-estoque" aria-controls="v-estoque" aria-selected="false"><span class="n">4</span>Crédito de estoque</button>
   <button class="tab" role="tab" id="t-fornec" aria-controls="v-fornec" aria-selected="false"><span class="n">5</span>Fornecedores</button>
+  <button class="tab" role="tab" id="t-regime" aria-controls="v-regime" aria-selected="false"><span class="n">6</span>Melhor regime 2027</button>
   <button class="tab" role="tab" id="t-prem" aria-controls="v-prem" aria-selected="false"><span class="n">⚙</span>Premissas e metodologia</button>
 </nav>
 
@@ -286,6 +287,61 @@
   </div>
 </section>
 
+<!-- =============================================================== 6. MELHOR REGIME -->
+<section class="view" id="v-regime" role="tabpanel" aria-labelledby="t-regime" data-prem="rtcg-premissas" hidden>
+  <h2 class="sec">Análise do melhor regime tributário para 2027 <span class="cnt">Presumido × Real × Simples</span></h2>
+  <div class="box info"><h2><span class="ic">🧮</span>Como funciona</h2>
+    <p>Envie os arquivos dos <strong>últimos 12 meses</strong>: <strong>EFD ICMS/IPI</strong> e <strong>EFD Contribuições</strong> (um por mês, soltos ou num .zip) e a <strong>ECD</strong> ou os <strong>balancetes</strong> (CSV ou XLSX). O site lê tudo no seu navegador — nada é enviado a servidores — e:</p>
+    <ol class="passos">
+      <li>identifica os <strong>benefícios da LC 214/2025</strong> de cada produto (NCM) e serviço (item da LC 116 → NBS) vendido e calcula a <strong>CBS/IBS de 2027</strong> com as reduções e os créditos das compras;</li>
+      <li>monta a <strong>DRE</strong> (receita, custos, folha, despesas) para medir a <strong>margem real</strong> e compará-la com a margem presumida;</li>
+      <li>calcula <strong>IRPJ, CSLL, INSS patronal, ICMS/ISS e DAS</strong> em cada regime e mostra o de menor carga.</li>
+    </ol>
+    <p>Todos os valores lidos aparecem para revisão antes do cálculo. Sem arquivos, preencha os campos manualmente.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><span class="sig">1. Empresa e premissas</span></div>
+    <div class="grid">
+      <div class="field"><label for="r-nome">Nome da empresa</label><input id="r-nome" maxlength="120" placeholder="Preenchido pelos arquivos"></div>
+      <div class="field"><label for="r-atual">Regime tributário atual</label>
+        <select id="r-atual"><option value="LP">Lucro Presumido</option><option value="LR">Lucro Real</option><option value="SN">Simples Nacional</option><option value="SNH">Simples Nacional híbrido</option></select></div>
+      <div class="field"><label for="r-atvm">Presunção — mercadorias/produtos</label>
+        <select id="r-atvm"><option value="comercio">Comércio e indústria (IRPJ 8% · CSLL 12%)</option><option value="combustivel">Revenda de combustíveis (1,6% · 12%)</option></select></div>
+      <div class="field"><label for="r-atvs">Presunção — serviços</label>
+        <select id="r-atvs"><option value="servicos">Serviços em geral (32% · 32%)</option><option value="hospitalar">Hospitalares e transporte de cargas (8% · 12%)</option><option value="passageiros">Transporte de passageiros (16% · 12%)</option></select></div>
+      <div class="field"><label for="r-anxm">Simples — anexo das mercadorias</label><select id="r-anxm"><option value="I">Anexo I — Comércio</option><option value="II">Anexo II — Indústria</option></select></div>
+      <div class="field"><label for="r-anxs">Simples — anexo dos serviços</label><select id="r-anxs"><option value="III">Anexo III</option><option value="III/V">Anexo III ou V pelo Fator R</option><option value="IV">Anexo IV (CPP fora do DAS)</option><option value="V">Anexo V</option></select></div>
+      <div class="field"><label for="r-enc">INSS patronal + RAT + terceiros sobre a folha (%)</label><input id="r-enc" class="num" data-pct inputmode="decimal" value="27,8"><span class="hint">20% + RAT (1 a 3%) + terceiros (≈5,8%).</span></div>
+      <div class="field"><label for="r-b2b">Vendas para pessoas jurídicas (B2B, %)</label><input id="r-b2b" class="num" data-pct inputmode="decimal" placeholder="calculado pela EFD"><span class="hint">Importante para avaliar o Simples padrão (crédito limitado ao cliente).</span></div>
+      <div class="field"><label for="r-pcs">Compras de fornecedores do Simples (% das compras)</label><input id="r-pcs" class="num" data-pct inputmode="decimal" placeholder="0"><span class="hint">Use a aba Fornecedores para levantar.</span></div>
+      <div class="field"><label for="r-ccs">Crédito médio nessas compras (% do valor)</label><input id="r-ccs" class="num" data-pct inputmode="decimal" placeholder="0"><span class="hint">Valor de CBS/IBS pago no DAS pelos fornecedores.</span></div>
+    </div>
+    <div class="checks"><label><input type="checkbox" id="r-imped"> A empresa tem impedimento ao Simples Nacional (atividade vedada, sócio PJ etc.)</label></div>
+  </div>
+
+  <div class="card">
+    <div class="card-h"><span class="sig">2. Arquivos dos últimos 12 meses</span><span class="nome">EFD ICMS/IPI · EFD Contribuições · ECD · balancetes (.txt, .csv, .xlsx ou .zip)</span></div>
+    <div class="drop" id="r-drop" tabindex="0" role="button" aria-label="Selecionar ou arrastar os arquivos SPED e balancetes">
+      <div class="drop-ic" aria-hidden="true">⇪</div>
+      <div><strong>Arraste aqui os arquivos SPED e balancetes</strong><br><span>ou clique para selecionar. O tipo de cada arquivo é identificado automaticamente.</span></div>
+    </div>
+    <input id="r-files" type="file" multiple accept=".txt,.csv,.xlsx,.zip" hidden>
+    <div class="btns"><button class="btn sec" type="button" id="r-manual">Preencher sem arquivos</button><button class="btn link" type="button" id="r-limpar">Limpar</button><span class="msg" id="r-msg" role="status"></span></div>
+    <div id="r-arqs"></div>
+  </div>
+
+  <div class="card" id="r-dados" hidden>
+    <div class="card-h"><span class="sig">3. Dados consolidados de 12 meses — revise</span><span class="nome">Valores lidos dos arquivos; todos podem ser ajustados</span></div>
+    <div id="r-ben"></div>
+    <h3 class="sub">Receitas, custos e despesas (12 meses)</h3>
+    <div class="grid g3" id="r-campos"></div>
+    <div class="btns"><button class="btn" type="button" id="r-gerar">Gerar comparativo</button><span class="msg" id="r-msg2" role="alert"></span></div>
+  </div>
+
+  <div id="r-res" class="result" hidden aria-live="polite"></div>
+</section>
+
 <!-- =============================================================== PREMISSAS -->
 <section class="view" id="v-prem" role="tabpanel" aria-labelledby="t-prem" hidden>
   <h2 class="sec">Premissas de 2027</h2>
@@ -331,6 +387,12 @@
       <li>A opção pelo regime regular do IBS/CBS é confirmada no Consulta Optantes da Receita (“Mais informações” › “Eventos Futuros”), que tem captcha; o site não contorna o captcha — abre a consulta e o usuário registra o resultado, ou importa a planilha da consulta de regime híbrido.</li>
       <li>Classificação: Simples com opção (híbrido), fora do Simples ou com exclusão agendada → crédito integral; Simples sem opção (ou com opção cancelada) e MEI → crédito limitado ao IBS/CBS pago no DAS.</li>
     </ul>
+    <h3>Melhor regime 2027</h3>
+    <ul>
+      <li>Lê EFD ICMS/IPI (0000, 0150, 0200, C100, C170, C190, E110), EFD Contribuições (0000, 0110, 0150, 0200, A100, A170, C100, C170, F500, F550, M200, M600) e ECD (I050, I355) ou balancetes CSV/XLSX, no navegador.</li>
+      <li>CBS/IBS com os benefícios identificados por NCM e por serviço (LC 116 → NBS → cClassTrib), base sem ICMS/ISS e crédito sobre as compras; igual no Presumido e no Real.</li>
+      <li>Presumido: presunção trimestral (Lei 9.249/1995) com o acréscimo de 10% da LC 224/2025 sobre a receita acima de R$ 1,25 mi no trimestre; IRPJ 15% + adicional de 10% sobre o que excede R$ 60 mil no trimestre; CSLL 9%. Real: lucro contábil ± LALUR, prejuízo limitado a 30%. Simples: tabelas da LC 123/2006 com sublimite, Fator R e CPP do Anexo IV; híbrido com CBS/IBS fora do DAS.</li>
+    </ul>
     <h3>Serviços e CNAE</h3>
     <p>A NFS-e de 2027 identifica o serviço pela <strong>NBS</strong> (Nomenclatura Brasileira de Serviços), não pelo CNAE — por isso o simulador de nota pede a NBS. Você pode buscar pela descrição do serviço ou pelo item da lista da LC 116 (ex.: <code>17.19</code> para contabilidade).</p>
     <div class="disc">Simulação de caráter estimativo e informativo. Os valores dependem da veracidade e da completude das informações fornecidas, das alíquotas efetivamente fixadas para 2027 e de regulamentação posterior. Não substitui a apuração oficial, a análise do caso concreto nem a orientação de um profissional contábil habilitado.</div>
@@ -358,5 +420,6 @@
 <script src="assets/js/estoque.js"></script>
 <script src="assets/js/estoque-ui.js"></script>
 <script src="assets/js/fornecedores.js"></script>
+<script src="assets/js/regime.js"></script>
 </body>
 </html>

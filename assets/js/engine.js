@@ -190,6 +190,29 @@
     return { especificas: esp, gerais: ger };
   }
 
+  // ---------------------------------------------------------------- enquadramento automatico (NCM/NBS -> cClassTrib)
+  // Beneficios que dependem de condicao do adquirente ou da operacao nao sao aplicados automaticamente.
+  var CONDICIONAL = /administra[cç][aã]o p[uú]blica|[oó]rg[aã]os|entidades de sa[uú]de imunes|emerg[eê]ncia|soberania|diferimento|produtor rural|Programa Universidade|Institui[cç][aã]o Cient[ií]fica|cooperativ|zonas reabilitadas|reabilita[cç][aã]o urbana|projetos incentivados|Zona Franca|livre com[eé]rcio/i;
+  function reducaoMedia(x) { var r = x.red || {}; return (Number(r.cbs || 0) + Number(r.ibsUf || 0) + Number(r.ibsMun || 0)) / 3; }
+  function enquadrar(idx, tipo, c) {
+    var ap = classificacoesPara(idx, tipo, c);
+    var sug = tipo === 'nbs' && idx.rtc.nbsSug[c] ? idx.rtc.nbsSug[c] : null;
+    var esp = ap.especificas.slice();
+    if (sug) sug.c.forEach(function (cc) { var o = idx.porCodigo[cc]; if (o && cc !== '000001' && esp.indexOf(o) < 0 && ap.gerais.indexOf(o) >= 0) esp.push(o); });
+    var integral = idx.porCodigo['000001'];
+    // candidatos automaticos: anexo da LC 214 (NCM/NBS) ou correlacao oficial NBS -> cClassTrib
+    var cand = esp.filter(function (x) { return !CONDICIONAL.test(x.d) && !x.dif && x.gIBSCBS; });
+    if (sug && sug.c.indexOf('000001') >= 0) cand = cand.filter(function (x) { return ap.especificas.indexOf(x) >= 0; }); // NBS com tributacao integral prevista
+    cand.sort(function (a, b) { return reducaoMedia(b) - reducaoMedia(a); });
+    var escolhida = cand[0] || integral;
+    var outras = ap.gerais.filter(function (x) { return x.c !== '000001' && esp.indexOf(x) < 0; });
+    var motivo;
+    if (escolhida === integral) motivo = esp.length ? 'Os tratamentos vinculados a este código dependem de condições específicas (ex.: venda a órgão público, diferimento). Aplicada a tributação integral — altere se a operação se enquadrar.' : 'Nenhuma redução ou isenção vinculada a este código nas tabelas oficiais da Receita.';
+    else if (ap.especificas.indexOf(escolhida) >= 0) motivo = 'O código consta do anexo da LC 214/2025 vinculado a esta classificação nas tabelas oficiais da Receita.';
+    else motivo = 'Classificação indicada pela correlação oficial NBS × LC 116 × cClassTrib da NFS-e.';
+    return { integral: integral, especificas: esp, outras: outras, escolhida: escolhida, motivo: motivo, lc: sug ? sug.lc : [] };
+  }
+
   // ---------------------------------------------------------------- Simples Nacional (LC 123/2006)
   // Faixas, aliquotas nominais, parcelas a deduzir e reparticao vigentes da LC 123/2006.
   // A partir de 2027 (LC 214/2025), o percentual antes destinado ao PIS/Pasep + Cofins passa a ser
@@ -424,7 +447,7 @@
     PREMISSAS_PADRAO: PREMISSAS_PADRAO, REGIMES: REGIMES, CATEGORIAS: CATEGORIAS, ANEXOS: ANEXOS, FAIXAS_RBT12: FAIXAS_RBT12,
     baseNFe: baseNFe, baseNFSe: baseNFSe, baseSimplesNFe: baseSimplesNFe,
     calcularItemRegular: calcularItemRegular, calcularItemSimples: calcularItemSimples,
-    criarIndice: criarIndice, sujeitoIS: sujeitoIS, ncmNoAnexo: ncmNoAnexo, nbsNoAnexo: nbsNoAnexo, classificacoesPara: classificacoesPara,
+    criarIndice: criarIndice, sujeitoIS: sujeitoIS, enquadrar: enquadrar, reducaoMedia: reducaoMedia, ncmNoAnexo: ncmNoAnexo, nbsNoAnexo: nbsNoAnexo, classificacoesPara: classificacoesPara,
     simplesAliquotas: simplesAliquotas, simularEmpresa: simularEmpresa, ratear: ratear
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
