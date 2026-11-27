@@ -196,7 +196,7 @@
   <h2 class="sec">Crédito presumido de CBS sobre o estoque de abertura <span class="cnt">art. 381 · LC 214/2025</span></h2>
   <div class="box info"><h2><span class="ic">📦</span>Como funciona</h2>
     <p>Empresas que em 2026 estão no <strong>regime cumulativo do PIS/Cofins (Lucro Presumido)</strong> podem apropriar um <strong>crédito presumido de CBS de 9,25%</strong> sobre o custo de aquisição dos bens em estoque em <strong>1º/01/2027</strong>. O crédito depende do <strong>inventário de 31/12/2026</strong>, deve ser apropriado <strong>até 30/06/2027</strong> e é utilizado em <strong>12 parcelas mensais iguais</strong>, somente para abater a própria CBS. No Lucro Real, o crédito alcança apenas os bens adquiridos com PIS/Cofins monofásico ou por substituição tributária.</p>
-    <p><strong>Como o inventário de 31/12/2026 ainda não existe, o site faz uma projeção:</strong> envie a <strong>EFD ICMS/IPI e a EFD Contribuições</strong> de 2026 (de preferência desde a EFD que traz o inventário de 31/12/2025 no Bloco H) e, se quiser, os XMLs das notas de compra. O site calcula, mês a mês, quanto entrou e quanto saiu a custo, tira a média dos últimos 1 ou 2 meses e projeta o estoque até dezembro — o <strong>inventário de abertura projetado</strong> — separando o que dá crédito do que não dá. Só com XMLs, o cálculo considera que tudo o que foi comprado ainda está em estoque.</p>
+    <p><strong>Como o inventário de 31/12/2026 ainda não existe, o site faz uma projeção:</strong> envie a <strong>EFD ICMS/IPI e a EFD Contribuições</strong> de <strong>no mínimo 2 meses</strong> de 2026 (quanto mais meses, idealmente desde janeiro, mais próximo do estoque real) e, se quiser, os XMLs das notas de compra. O site calcula um <strong>pseudo-inventário</strong> item a item — o que entrou a custo menos o que saiu a custo, mês a mês —, tira a média de entradas e saídas de no mínimo 2 meses e projeta o estoque até dezembro — o <strong>inventário de abertura projetado</strong> —, separando o que dá crédito do que não dá. Só com XMLs, o cálculo considera que tudo o que foi comprado ainda está em estoque.</p>
   </div>
 
   <form id="f-est" class="card" autocomplete="off" novalidate>
@@ -237,11 +237,12 @@
   </div>
 
   <div class="card" id="e-proj-card" hidden>
-    <div class="card-h"><span class="sig">3. Projeção até 31/12/2026</span><span class="nome">Média de entradas e saídas dos meses-base</span></div>
+    <div class="card-h"><span class="sig">3. Pseudo-inventário e projeção até 31/12/2026</span><span class="nome">Entradas − saídas a custo, média de no mínimo 2 meses</span></div>
     <div class="grid">
-      <div class="field"><label for="e-ini">Ponto de partida do estoque</label><select id="e-ini"></select><span class="hint">O Bloco H (inventário) atualizado pelas EFD é o mais preciso.</span></div>
+      <div class="field"><label for="e-ini">Ponto de partida do estoque</label><select id="e-ini"></select><span class="hint">Padrão: pseudo-inventário calculado pelas entradas e saídas das EFD.</span></div>
+      <div class="field" id="e-estini-w"><label for="e-estini">Estoque inicial no começo do primeiro mês (R$, opcional)</label><input id="e-estini" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Se souber o estoque com direito a crédito antes do período; senão, o cálculo parte de zero.</span></div>
       <div class="field" id="e-estinf-w" hidden><label for="e-estinf">Estoque com direito a crédito no fim do último mês (R$)</label><input id="e-estinf" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Valor a custo, do controle de estoque da empresa.</span></div>
-      <div class="field"><label for="e-base">Meses-base para a média</label><select id="e-base"></select><span class="hint">A projeção repete a média de entradas e saídas até dezembro.</span></div>
+      <div class="field"><label for="e-base">Meses-base para a média</label><select id="e-base"></select><span class="hint">Mínimo de 2 meses. A projeção repete a média de entradas e saídas até dezembro.</span></div>
       <div class="field"><label for="e-margem">Margem bruta média (%)</label><input id="e-margem" class="num" data-pct inputmode="decimal" value="30"><span class="hint">Só para vendas sem custo identificável (ex.: NFC-e consolidada de itens sem entrada).</span></div>
     </div>
   </div>
@@ -394,7 +395,7 @@
     <h3>Crédito de estoque (art. 381 da LC 214/2025)</h3>
     <ul>
       <li>Crédito presumido de CBS de 9,25% sobre o custo de aquisição dos bens em estoque em 1º/01/2027 (inventário de 31/12/2026), para quem estava no regime cumulativo do PIS/Cofins; no Lucro Real, apenas bens adquiridos com PIS/Cofins monofásico ou por substituição tributária. Nos importados, o crédito é o PIS/Cofins-Importação pago.</li>
-      <li><strong>Projeção do inventário de abertura:</strong> com a EFD ICMS/IPI e a EFD Contribuições de 2026, o site parte do inventário do Bloco H (H005/H010) atualizado mês a mês — ou do estoque dos XMLs, ou de um valor informado — e projeta até 31/12/2026 com a média de entradas (C170 de entrada, a custo) e saídas (quantidade vendida × custo médio ponderado do item; NFC-e consolidada pela relação custo/preço) dos últimos 1 ou 2 meses. Fornecedores do Simples são identificados pelo CRT do XML (por CNPJ).</li>
+      <li><strong>Projeção do inventário de abertura:</strong> com a EFD ICMS/IPI e a EFD Contribuições de no mínimo 2 meses de 2026, o site calcula um pseudo-inventário item a item — entradas a custo (C170 de entrada) menos saídas a custo (quantidade vendida × custo médio ponderado do item; NFC-e consolidada pela relação custo/preço), mês a mês, a partir de zero ou de um estoque inicial informado — e projeta até 31/12/2026 com a média de no mínimo 2 meses. Opcionalmente, parte do estoque dos XMLs, de um valor informado ou do Bloco H. Fornecedores do Simples são identificados pelo CRT do XML (por CNPJ).</li>
       <li>Custo de aquisição por item: produto − desconto + frete + seguro + outras despesas + IPI + ICMS-ST + II − ICMS recuperável (opções editáveis). O custo unitário é a média das compras enviadas; a quantidade em estoque é editável (padrão: toda a quantidade comprada).</li>
       <li>Sem crédito: bens adquiridos com alíquota zero, isenção, sem incidência ou suspensão de PIS/Cofins (CST 06 a 09), uso e consumo, ativo imobilizado, transferências, devoluções e remessas. Em revisão (não somados por padrão): fornecedor do Simples Nacional e CFOP atípico.</li>
       <li>Apropriação até 30/06/2027 e utilização em 12 parcelas mensais iguais a partir do mês de apropriação, somente contra a CBS (Decreto nº 12.955/2026, arts. 605 a 613). Os XMLs são lidos no navegador e não são enviados a servidores.</li>

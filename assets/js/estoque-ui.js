@@ -176,7 +176,7 @@
     st.efd.forEach(function (m) { meses[m.mes] = 1; if (m.tipo === 'icms') icms++; else con++; if (m.inventario) inv = m.inventario; });
     var l = Object.keys(meses).sort();
     return '<strong>' + st.efd.length + '</strong> EFD lida(s): ' + icms + ' ICMS/IPI · ' + con + ' Contribuições · ' + (l.length ? 'de ' + mesBR(l[0]) + ' a ' + mesBR(l[l.length - 1]) : '') +
-      (inv ? ' · inventário (Bloco H) de ' + inv.data.replace(/^(\d{2})(\d{2})(\d{4})$/, '$1/$2/$3') : ' · sem inventário (Bloco H)');
+      (l.length < 2 ? ' · <strong>envie no mínimo 2 meses</strong> para calcular o pseudo-inventário' : ' · pseudo-inventário calculado pelas entradas e saídas') + (inv ? ' · inventário (Bloco H) de ' + inv.data.replace(/^(\d{2})(\d{2})(\d{4})$/, '$1/$2/$3') + ' disponível como partida opcional' : '');
   }
   function prepararProjecao() {
     var card = $('#e-proj-card'); if (!card) return;
@@ -184,13 +184,18 @@
     var meses = {}, temH = false;
     st.efd.forEach(function (m) { if (m.mes) meses[m.mes] = 1; if (m.inventario) temH = true; });
     var l = Object.keys(meses).sort(), ini = $('#e-ini'), atual = ini.value;
-    ini.innerHTML = (temH ? '<option value="bloco-h">Inventário do Bloco H, atualizado mês a mês pelas EFD</option>' : '') +
-      (st.lidas.length ? '<option value="xml">Estoque calculado pelos XMLs (item 4), no fim de ' + (l.length ? mesBR(l[l.length - 1]) : 'último mês') + '</option>' : '') +
-      '<option value="informado">Valor informado do estoque no fim de ' + (l.length ? mesBR(l[l.length - 1]) : 'último mês') + '</option>';
+    var fimL = l.length ? mesBR(l[l.length - 1]) : 'último mês';
+    ini.innerHTML = '<option value="calculado">Pseudo-inventário (entradas − saídas)</option>' +
+      (st.lidas.length ? '<option value="xml">Estoque calculado pelos XMLs (item 4), no fim de ' + fimL + '</option>' : '') +
+      '<option value="informado">Valor informado do estoque no fim de ' + fimL + '</option>' +
+      (temH ? '<option value="bloco-h">Opcional: inventário do Bloco H, atualizado pelas EFD</option>' : '');
     if (atual && ini.querySelector('option[value="' + atual + '"]')) ini.value = atual;
     $('#e-estinf-w').hidden = ini.value !== 'informado';
-    var b = $('#e-base'), ab = b.value;
-    b.innerHTML = l.length >= 2 ? '<option value="2">2 meses: ' + mesBR(l[l.length - 2]) + ' e ' + mesBR(l[l.length - 1]) + '</option><option value="1">1 mês: ' + mesBR(l[l.length - 1]) + '</option>' : '<option value="1">1 mês: ' + (l.length ? mesBR(l[0]) : '') + '</option>';
+    $('#e-estini-w').hidden = ini.value !== 'calculado';
+    var b = $('#e-base'), ab = b.value, ops = '';
+    [2, 3, 6].forEach(function (nn) { if (nn <= l.length) ops += '<option value="' + nn + '">Últimos ' + nn + ' meses</option>'; });
+    if (l.length > 6 || (l.length > 3 && l.length < 6)) ops += '<option value="' + l.length + '">Todos os ' + l.length + ' meses</option>';
+    b.innerHTML = ops || '<option value="2">mínimo de 2 meses</option>';
     if (ab && b.querySelector('option[value="' + ab + '"]')) b.value = ab;
   }
   function estoqueXmlPorGrupo() {
@@ -206,8 +211,9 @@
     var crtCh = {}, crtCn = {}, emp = ($('#e-cnpj').value || '').replace(/\D/g, '');
     st.lidas.forEach(function (n) { if (n.tipo === 'nfe' && n.emit && n.emit.cnpj !== emp) { crtCh[n.chave] = n.emit.crt; crtCn[n.emit.cnpj] = n.emit.crt; } });
     var p = param(), est = num($('#e-estinf').value), mg = num($('#e-margem').value, true);
+    var eini = num($('#e-estini').value);
     st.proj = E.projetarEstoque(st.efd, { regime: p.regime, excluirIcms: p.excluirIcms, incluirIpi: p.incluirIpi, incluirSt: p.incluirSt, aliquota: p.aliquota,
-      mesesBase: Number($('#e-base').value) || 2, inicio: $('#e-ini').value || undefined, estoqueInformado: est.ok ? est.v : 0,
+      mesesBase: Number($('#e-base').value) || 2, inicio: $('#e-ini').value || 'calculado', estoqueInformado: est.ok ? est.v : 0, estoqueInicial: eini.ok ? eini.v : 0,
       margemBruta: mg.ok && !mg.vazio ? mg.v : 30, crtPorChave: crtCh, crtPorCnpj: crtCn, estoqueXml: estoqueXmlPorGrupo() });
     return st.proj;
   }
@@ -227,10 +233,12 @@
       '<div class="ct a"><div class="n">' + R(credito) + '</div><div class="l">Crédito presumido de CBS projetado</div></div>' +
       '<div class="ct b"><div class="n">' + brl(cr[0] ? cr[0].valor : 0n) + '</div><div class="l">Parcela mensal (12×), a partir de ' + MESES[mesAp - 1] + '/2027</div></div>' +
       '<div class="ct c"><div class="n">' + R(pr.final.nao) + '</div><div class="l">Estoque projetado sem direito a crédito</div></div></div>';
-    var partida = pr.inicio === 'bloco-h' ? 'o inventário do Bloco H de ' + pr.inventario.data.replace(/^(\d{2})(\d{2})(\d{4})$/, '$1/$2/$3') + ', atualizado mês a mês com as entradas e saídas das EFD até ' + mesBR(pr.ultimoMesArquivo)
+    var eiv = num($('#e-estini').value);
+    var partida = pr.inicio === 'calculado' ? 'um <strong>pseudo-inventário</strong> calculado pelas entradas e saídas a custo das EFD de ' + mesBR(pr.primeiroMesArquivo) + ' a ' + mesBR(pr.ultimoMesArquivo) + ', item a item, a partir de ' + (eiv.ok && Number(eiv.v) > 0 ? 'um estoque inicial informado de ' + R(Number(eiv.v)) : 'zero') + ' (considera apenas o que foi comprado nesses meses)'
+      : pr.inicio === 'bloco-h' ? 'o inventário do Bloco H de ' + pr.inventario.data.replace(/^(\d{2})(\d{2})(\d{4})$/, '$1/$2/$3') + ', atualizado mês a mês com as entradas e saídas das EFD até ' + mesBR(pr.ultimoMesArquivo)
       : pr.inicio === 'xml' ? 'o estoque calculado pelos XMLs, considerado no fim de ' + mesBR(pr.ultimoMesArquivo) : 'o valor de estoque informado para o fim de ' + mesBR(pr.ultimoMesArquivo);
     h += '<div class="box info"><h2><span class="ic">📈</span>Isto é uma projeção</h2><p>O inventário de 31/12/2026 ainda não foi levantado. O ponto de partida é ' + partida + '. ' +
-      'Nos meses-base (' + pr.mesesBase.map(mesBR).join(' e ') + ') a empresa teve, em média, <strong>' + R(med.ent) + ' de entradas</strong> e <strong>' + R(med.sai) + ' de saídas a custo</strong> por mês em itens com direito a crédito. ' +
+      'Nos meses-base (' + pr.mesesBase.map(mesBR).join(', ').replace(/, ([^,]*)$/, ' e $1') + ') a empresa teve, em média, <strong>' + R(med.ent) + ' de entradas</strong> e <strong>' + R(med.sai) + ' de saídas a custo</strong> por mês em itens com direito a crédito. ' +
       (proj.length ? 'Seguindo essa média, ' + proj.map(function (l, i) { var g = l.grupos.elegivel; return (i ? mesBR(l.mes) + ' começa com ' + R(g.ini) + ', recebe ' + R(g.ent) + ', baixa ' + R(g.sai) + ' e termina com <strong>' + R(g.fim) + '</strong>' : mesBR(l.mes) + ' deve terminar com <strong>' + R(g.fim) + '</strong> (' + R(g.ini) + ' + ' + R(g.ent) + ' − ' + R(g.sai) + ')'); }).join('; ') + ' — o <strong>inventário de abertura projetado</strong>.' : 'Os arquivos já chegam a dezembro de 2026: o estoque final é o apurado pelas EFD.') + '</p>' +
       '<p>Quando o inventário real de 31/12/2026 for levantado, substitua a projeção pelo valor apurado.</p></div>';
     if (pr.potencialRevisar > 0) h += '<div class="box alert"><h2><span class="ic">🔎</span>Itens em revisão</h2><p>Estoque projetado de ' + R(pr.final.revisar) + ' em itens de fornecedores do Simples Nacional, CFOP atípico ou em produção (crédito potencial de ' + R(pr.potencialRevisar) + ', <strong>não somado</strong>).</p></div>';
@@ -284,7 +292,7 @@
     $('#e-mais-w').innerHTML = lista.length > st.limite ? '<button class="btn sec" type="button" id="e-mais">Mostrar mais ' + Math.min(300, lista.length - st.limite) + ' produtos</button>' : '';
   }
   function renderIgnorados() {
-    var ign = st.erros.concat(st.res.ignoradas);
+    var ign = st.erros.concat(st.res ? st.res.ignoradas : []);
     $('#e-ign').innerHTML = ign.length ? '<details class="ign"><summary>' + ign.length + ' arquivo(s) não aproveitado(s) — ver motivos</summary><ul>' +
       ign.slice(0, 500).map(function (i) { return '<li><strong>' + esc(i.arquivo) + '</strong>: ' + esc(i.motivo) + '</li>'; }).join('') + (ign.length > 500 ? '<li>…</li>' : '') + '</ul></details>' : '';
   }
@@ -368,7 +376,7 @@
     });
     $('#f-est').addEventListener('submit', function (ev) { ev.preventDefault(); });
     var pc = $('#e-proj-card');
-    if (pc) { pc.addEventListener('change', function () { $('#e-estinf-w').hidden = $('#e-ini').value !== 'informado'; if (st.efd.length) renderResumo(); }); pc.addEventListener('input', function (ev) { if (st.efd.length && ev.target.matches('input')) renderResumo(); }); }
+    if (pc) { pc.addEventListener('change', function () { $('#e-estinf-w').hidden = $('#e-ini').value !== 'informado'; $('#e-estini-w').hidden = $('#e-ini').value !== 'calculado'; if (st.efd.length) renderResumo(); }); pc.addEventListener('input', function (ev) { if (st.efd.length && ev.target.matches('input')) renderResumo(); }); }
     $('#e-outros').addEventListener('input', function () { if (st.res) renderResumo(); });
     $('#e-aliq').addEventListener('input', function () { if (st.res) { renderResumo(); renderTabela(); } });
     $('#e-pct-ap').addEventListener('click', function () {

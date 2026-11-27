@@ -33,9 +33,10 @@ Site estático (HTML/CSS/JS, sem servidor) para simular a **CBS** e o **IBS** de
 Campos numéricos aceitam qualquer formato: 2000, 2.000, 2.000,00, 2000,5 ou 1,234.56.
 
 4. **Crédito de estoque** — crédito presumido de CBS sobre o estoque de abertura de 2027 (art. 381 da
-   LC 214/2025). **Projeção do inventário de 31/12/2026**: com as EFD de 2026, parte do Bloco H
-   atualizado mês a mês (ou do estoque dos XMLs, ou de valor informado) e projeta até dezembro pela média
-   de entradas e saídas a custo dos últimos 1–2 meses, com relatório mês a mês. A pessoa envia os XMLs das notas de compra (arquivos, pasta inteira ou .zip, sem
+   LC 214/2025). **Projeção do inventário de 31/12/2026**: com no mínimo 2 meses de EFD de 2026,
+   calcula um pseudo-inventário item a item (entradas − saídas a custo, mês a mês) e projeta até dezembro
+   pela média de no mínimo 2 meses, com relatório mês a mês (partidas opcionais: XMLs, valor informado
+   ou Bloco H). A pessoa envia os XMLs das notas de compra (arquivos, pasta inteira ou .zip, sem
    limite; lidos no próprio navegador). O site separa o que gera crédito (revenda/insumo, ST e
    monofásico, importação) do que não gera (alíquota zero/isenção/suspensão, uso e consumo,
    imobilizado, transferência, devolução, remessa, notas canceladas e duplicadas), calcula 9,25% sobre o
