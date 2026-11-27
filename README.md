@@ -14,8 +14,10 @@ Site estático (HTML/CSS/JS, sem servidor) para simular a **CBS** e o **IBS** de
 1. **Simulador da empresa** — nome da empresa (sem CNPJ), regime (Lucro Real, Lucro Presumido,
    Simples Nacional padrão ou Simples optante pelo regime regular de IBS/CBS), **faturamento por
    faixa de tributação** (integral; reduções de 30%, 40%, 50%, 60%, 70%, 80%; alíquota zero;
-   isento/imune/exportação), com o faturamento bruto somado automaticamente, deduções (descontos,
-   ICMS, ISS — rateadas entre as faixas) e compras com crédito. No Simples padrão, seguindo a
+   isento/imune/exportação) **e devoluções da mesma faixa**, com o faturamento bruto somado
+   automaticamente; ICMS e ISS rateados entre as faixas; compras com crédito. **Preenchimento pela EFD**:
+   envie a EFD ICMS/IPI e a EFD Contribuições de 2026 e cada venda/devolução é classificada pelo NCM/NBS
+   como seria tributada em 2027 (média mensal). No Simples padrão, seguindo a
    calculadora oficial, as reduções não alteram o DAS; só a faixa isenta/exportação fica fora. Mostra a receita líquida (base), débitos, créditos, CBS e IBS a recolher, carga efetiva
    e comparativo com o PIS/Cofins de 2026.
 2. **Painel do contador** — vários clientes de uma vez (digitação ou importação de CSV),
@@ -31,7 +33,9 @@ Site estático (HTML/CSS/JS, sem servidor) para simular a **CBS** e o **IBS** de
 Campos numéricos aceitam qualquer formato: 2000, 2.000, 2.000,00, 2000,5 ou 1,234.56.
 
 4. **Crédito de estoque** — crédito presumido de CBS sobre o estoque de abertura de 2027 (art. 381 da
-   LC 214/2025). A pessoa envia os XMLs das notas de compra (arquivos, pasta inteira ou .zip, sem
+   LC 214/2025). **Projeção do inventário de 31/12/2026**: com as EFD de 2026, parte do Bloco H
+   atualizado mês a mês (ou do estoque dos XMLs, ou de valor informado) e projeta até dezembro pela média
+   de entradas e saídas a custo dos últimos 1–2 meses, com relatório mês a mês. A pessoa envia os XMLs das notas de compra (arquivos, pasta inteira ou .zip, sem
    limite; lidos no próprio navegador). O site separa o que gera crédito (revenda/insumo, ST e
    monofásico, importação) do que não gera (alíquota zero/isenção/suspensão, uso e consumo,
    imobilizado, transferência, devolução, remessa, notas canceladas e duplicadas), calcula 9,25% sobre o

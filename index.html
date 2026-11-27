@@ -57,19 +57,26 @@
       <div class="field"><label for="s-mes">Mês de referência</label><input id="s-mes" name="mes" type="month" value="2027-01" min="2027-01" max="2027-12"></div>
     </div>
 
-    <h3 class="sub">Faturamento do mês por tratamento tributário</h3>
-    <p class="hint-bloco">Separe o faturamento conforme a tributação de cada produto ou serviço vendido. <strong>Não sabe separar? Informe tudo em “Tributado integralmente”.</strong></p>
+    <h3 class="sub">Faturamento e devoluções do mês por tratamento tributário</h3>
+    <div class="efd-box no-print">
+      <div><strong>Tem as EFD de 2026?</strong> Envie a EFD ICMS/IPI e a EFD Contribuições (um ou mais meses, soltas ou em .zip): o site classifica cada venda e devolução pelo NCM/NBS como seria tributada em 2027 e preenche as faixas, o ICMS, o ISS e as compras com a média mensal.</div>
+      <label class="btn sec" for="s-efd">Preencher pela EFD</label><input id="s-efd" type="file" multiple accept=".txt,.zip" hidden>
+    </div>
+    <div id="s-efd-res" class="hint-bloco" role="status"></div>
+    <p class="hint-bloco">Informe em cada linha o faturamento e as devoluções/descontos <strong>da mesma tributação</strong>. <strong>Não sabe separar? Informe tudo em “Tributado integralmente”.</strong></p>
     <p class="hint-bloco" id="s-sn-nota" hidden>No Simples Nacional padrão, as reduções de alíquota não diminuem o DAS (regra da calculadora oficial do Simples); apenas a faixa “Isento, imune, não tributado ou exportação” fica fora da CBS/IBS.</p>
-    <div class="faixas" id="s-fat" role="group" aria-label="Faturamento por tratamento tributário"></div>
-    <div class="fat-total"><span>Faturamento bruto do mês (soma das faixas)</span><strong id="s-bruto-total">R$ 0,00</strong></div>
+    <div class="faixas2" role="group" aria-label="Faturamento e devoluções por tratamento tributário">
+      <div class="fx-cab" aria-hidden="true"><span>Tributação em 2027</span><span>Faturamento do mês (R$)</span><span>Devoluções e descontos (R$)</span></div>
+      <div id="s-fat"></div>
+    </div>
+    <div class="fat-total"><span>Faturamento bruto do mês (soma das faixas)</span><strong id="s-bruto-total">R$ 0,00</strong><span>Devoluções e descontos</span><strong id="s-devol-total">R$ 0,00</strong></div>
 
-    <h3 class="sub">Deduções do faturamento</h3>
+    <h3 class="sub">Tributos que saem da base em 2027</h3>
     <div class="grid g3">
-      <div class="field"><label for="s-desc">Descontos e devoluções (R$)</label><input id="s-desc" name="descontos" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Descontos incondicionais e vendas devolvidas.</span></div>
       <div class="field only-reg"><label for="s-icms">ICMS destacado nas vendas (R$)</label><input id="s-icms" name="icms" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Em 2027 o ICMS (e o FCP) sai da base da CBS/IBS.</span></div>
       <div class="field only-reg"><label for="s-iss">ISS dos serviços (R$)</label><input id="s-iss" name="iss" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Em 2027 o ISS sai da base da CBS/IBS.</span></div>
     </div>
-    <p class="hint-bloco">As deduções são distribuídas entre as faixas na proporção do faturamento de cada uma.</p>
+    <p class="hint-bloco">As devoluções são abatidas na faixa informada; o ICMS e o ISS são distribuídos entre as faixas na proporção do faturamento.</p>
 
     <div class="only-sn" hidden>
       <h3 class="sub">Simples Nacional</h3>
@@ -189,7 +196,7 @@
   <h2 class="sec">Crédito presumido de CBS sobre o estoque de abertura <span class="cnt">art. 381 · LC 214/2025</span></h2>
   <div class="box info"><h2><span class="ic">📦</span>Como funciona</h2>
     <p>Empresas que em 2026 estão no <strong>regime cumulativo do PIS/Cofins (Lucro Presumido)</strong> podem apropriar um <strong>crédito presumido de CBS de 9,25%</strong> sobre o custo de aquisição dos bens em estoque em <strong>1º/01/2027</strong>. O crédito depende do <strong>inventário de 31/12/2026</strong>, deve ser apropriado <strong>até 30/06/2027</strong> e é utilizado em <strong>12 parcelas mensais iguais</strong>, somente para abater a própria CBS. No Lucro Real, o crédito alcança apenas os bens adquiridos com PIS/Cofins monofásico ou por substituição tributária.</p>
-    <p>Envie os XMLs das notas de compra dos produtos que estão em estoque. O site lê cada nota, separa o que dá crédito e o que não dá, e monta o cálculo e o cronograma.</p>
+    <p><strong>Como o inventário de 31/12/2026 ainda não existe, o site faz uma projeção:</strong> envie a <strong>EFD ICMS/IPI e a EFD Contribuições</strong> de 2026 (de preferência desde a EFD que traz o inventário de 31/12/2025 no Bloco H) e, se quiser, os XMLs das notas de compra. O site calcula, mês a mês, quanto entrou e quanto saiu a custo, tira a média dos últimos 1 ou 2 meses e projeta o estoque até dezembro — o <strong>inventário de abertura projetado</strong> — separando o que dá crédito do que não dá. Só com XMLs, o cálculo considera que tudo o que foi comprado ainda está em estoque.</p>
   </div>
 
   <form id="f-est" class="card" autocomplete="off" novalidate>
@@ -214,13 +221,13 @@
   </form>
 
   <div class="card">
-    <div class="card-h"><span class="sig">2. Notas fiscais de compra (XML)</span><span class="nome">Sem limite de quantidade · aceita .xml e .zip</span></div>
+    <div class="card-h"><span class="sig">2. EFD de 2026 e notas de compra (XML)</span><span class="nome">Sem limite de quantidade · aceita .txt (EFD), .xml e .zip</span></div>
     <div class="drop" id="e-drop" tabindex="0" role="button" aria-label="Selecionar ou arrastar arquivos XML ou ZIP">
       <div class="drop-ic" aria-hidden="true">⇪</div>
-      <div><strong>Arraste aqui os XMLs ou arquivos .zip</strong><br><span>ou use os botões abaixo. Os arquivos são lidos no seu navegador — nada é enviado para servidores.</span></div>
+      <div><strong>Arraste aqui as EFD (.txt), os XMLs ou arquivos .zip</strong><br><span>ou use os botões abaixo. Os arquivos são lidos no seu navegador — nada é enviado para servidores.</span></div>
     </div>
     <div class="btns">
-      <label class="btn" for="e-files">Selecionar arquivos</label><input id="e-files" type="file" accept=".xml,.zip,application/zip,text/xml" multiple hidden>
+      <label class="btn" for="e-files">Selecionar arquivos</label><input id="e-files" type="file" accept=".xml,.txt,.zip,application/zip,text/xml,text/plain" multiple hidden>
       <label class="btn sec" for="e-dir">Selecionar pasta</label><input id="e-dir" type="file" webkitdirectory multiple hidden>
       <button class="btn link" type="button" id="e-limpar">Limpar notas</button>
       <span class="msg" id="e-msg" role="status"></span>
@@ -229,8 +236,18 @@
     <div id="e-lidos" class="hint-bloco"></div>
   </div>
 
+  <div class="card" id="e-proj-card" hidden>
+    <div class="card-h"><span class="sig">3. Projeção até 31/12/2026</span><span class="nome">Média de entradas e saídas dos meses-base</span></div>
+    <div class="grid">
+      <div class="field"><label for="e-ini">Ponto de partida do estoque</label><select id="e-ini"></select><span class="hint">O Bloco H (inventário) atualizado pelas EFD é o mais preciso.</span></div>
+      <div class="field" id="e-estinf-w" hidden><label for="e-estinf">Estoque com direito a crédito no fim do último mês (R$)</label><input id="e-estinf" class="num" inputmode="decimal" placeholder="0,00"><span class="hint">Valor a custo, do controle de estoque da empresa.</span></div>
+      <div class="field"><label for="e-base">Meses-base para a média</label><select id="e-base"></select><span class="hint">A projeção repete a média de entradas e saídas até dezembro.</span></div>
+      <div class="field"><label for="e-margem">Margem bruta média (%)</label><input id="e-margem" class="num" data-pct inputmode="decimal" value="30"><span class="hint">Só para vendas sem custo identificável (ex.: NFC-e consolidada de itens sem entrada).</span></div>
+    </div>
+  </div>
+
   <div class="card" id="e-inv-card" hidden>
-    <div class="card-h"><span class="sig">3. Inventário em 31/12/2026</span><span class="nome">Quanto do que foi comprado ainda estava em estoque</span></div>
+    <div class="card-h"><span class="sig">4. Estoque pelos XMLs</span><span class="nome">Usado quando não há EFD ou como ponto de partida</span></div>
     <p class="hint-bloco">Por padrão, o site considera que <strong>toda a quantidade comprada</strong> nas notas enviadas ainda estava em estoque. Ajuste item a item na tabela abaixo, aplique um percentual geral ou importe o inventário (CSV com <code>codigo;quantidade</code> ou <code>descricao;quantidade</code> — itens que não constarem do inventário ficam com quantidade zero).</p>
     <div class="btns">
       <span class="inline-field"><label for="e-pct">% ainda em estoque</label><input id="e-pct" data-pct class="num" inputmode="decimal" placeholder="100"></span>
@@ -368,7 +385,7 @@
       <li><strong>CBS a 11,3%</strong> (alíquota adotada nesta simulação; editável acima). A alíquota oficial de 2027 será fixada por resolução do Senado.</li>
       <li><strong>IBS a 0,1%</strong> (0,05% estadual + 0,05% municipal), alíquotas de teste de 2027–2028.</li>
       <li>Base de cálculo 2027: ICMS, FCP e ISS deixam de compor a base da CBS/IBS; PIS e Cofins estão extintos; o Imposto Seletivo integra a base.</li>
-      <li>Simulador da empresa: o faturamento é informado por faixa de tributação (integral e reduções de 30%, 40%, 50%, 60%, 70%, 80% e 100%, além de isento/imune/exportação). Descontos, ICMS e ISS são distribuídos entre as faixas na proporção do faturamento de cada uma.</li>
+      <li>Simulador da empresa: o faturamento e as devoluções são informados por faixa de tributação (cada devolução abate a sua própria faixa) ou preenchidos pela EFD ICMS/IPI e EFD Contribuições de 2026, com cada venda e devolução classificada pelo NCM/NBS como seria tributada em 2027 (média mensal). Faixas (integral e reduções de 30%, 40%, 50%, 60%, 70%, 80% e 100%, além de isento/imune/exportação). Descontos, ICMS e ISS são distribuídos entre as faixas na proporção do faturamento de cada uma.</li>
       <li>Lucro Real e Lucro Presumido apuram CBS/IBS pelo regime regular (débito − crédito). O regime do IRPJ não altera o cálculo da CBS/IBS; o comparativo com PIS/Cofins de 2026 é apenas referência.</li>
       <li><strong>Simples Nacional padrão:</strong> CBS e IBS dentro do DAS. A alíquota efetiva vem das tabelas da LC 123/2006 (faixa pela RBT12); a parcela antes destinada a PIS/Cofins passa a CBS + IBS. A divisão CBS × IBS é estimada (IBS ≈ 1,1% dessa parcela, arredondado), reproduzindo as tabelas de 2027 divulgadas. Quando disponível, informe o pCBSSN/pIBSSN do PGDAS.</li>
       <li><strong>Simples optante pelo regime regular:</strong> o DAS deixa de incluir CBS/IBS, que passam a ser apurados como no regime regular, com créditos.</li>
@@ -377,6 +394,7 @@
     <h3>Crédito de estoque (art. 381 da LC 214/2025)</h3>
     <ul>
       <li>Crédito presumido de CBS de 9,25% sobre o custo de aquisição dos bens em estoque em 1º/01/2027 (inventário de 31/12/2026), para quem estava no regime cumulativo do PIS/Cofins; no Lucro Real, apenas bens adquiridos com PIS/Cofins monofásico ou por substituição tributária. Nos importados, o crédito é o PIS/Cofins-Importação pago.</li>
+      <li><strong>Projeção do inventário de abertura:</strong> com a EFD ICMS/IPI e a EFD Contribuições de 2026, o site parte do inventário do Bloco H (H005/H010) atualizado mês a mês — ou do estoque dos XMLs, ou de um valor informado — e projeta até 31/12/2026 com a média de entradas (C170 de entrada, a custo) e saídas (quantidade vendida × custo médio ponderado do item; NFC-e consolidada pela relação custo/preço) dos últimos 1 ou 2 meses. Fornecedores do Simples são identificados pelo CRT do XML (por CNPJ).</li>
       <li>Custo de aquisição por item: produto − desconto + frete + seguro + outras despesas + IPI + ICMS-ST + II − ICMS recuperável (opções editáveis). O custo unitário é a média das compras enviadas; a quantidade em estoque é editável (padrão: toda a quantidade comprada).</li>
       <li>Sem crédito: bens adquiridos com alíquota zero, isenção, sem incidência ou suspensão de PIS/Cofins (CST 06 a 09), uso e consumo, ativo imobilizado, transferências, devoluções e remessas. Em revisão (não somados por padrão): fornecedor do Simples Nacional e CFOP atípico.</li>
       <li>Apropriação até 30/06/2027 e utilização em 12 parcelas mensais iguais a partir do mês de apropriação, somente contra a CBS (Decreto nº 12.955/2026, arts. 605 a 613). Os XMLs são lidos no navegador e não são enviados a servidores.</li>

@@ -102,24 +102,66 @@
     $('#s-fat').innerHTML = R.CATEGORIAS.map(function (c) {
       var cls = c.paga === 100 ? '' : (c.paga === 0 ? ' z' : ' r');
       var paga = c.k === 'naoInc' ? 'sem CBS/IBS' : (c.paga === 0 ? 'paga 0% da alíquota' : 'paga ' + c.paga + '% da alíquota');
-      return '<div class="faixa' + cls + '"><label for="s-f-' + c.k + '">' + esc(c.nome) + '<span class="paga">' + paga + '</span></label>' +
-        '<input id="s-f-' + c.k + '" data-faixa="' + c.k + '" class="num" inputmode="decimal" placeholder="0,00" aria-describedby="s-fx-' + c.k + '">' +
-        '<span class="ex" id="s-fx-' + c.k + '">' + esc(c.ex) + '</span></div>';
+      return '<div class="fx-lin' + cls + '"><div class="trib"><label for="s-f-' + c.k + '">' + esc(c.nome) + '<span class="paga">' + paga + '</span></label>' +
+        '<span class="ex" id="s-fx-' + c.k + '">' + esc(c.ex) + '</span></div>' +
+        '<div><span class="rot-m">Faturamento</span><input id="s-f-' + c.k + '" data-faixa="' + c.k + '" class="num" inputmode="decimal" placeholder="0,00" aria-describedby="s-fx-' + c.k + '"></div>' +
+        '<div><span class="rot-m">Devoluções</span><input id="s-d-' + c.k + '" data-devol="' + c.k + '" class="num" inputmode="decimal" placeholder="0,00" aria-label="Devoluções e descontos — ' + esc(c.nome) + '"></div></div>';
     }).join('');
     $('#s-fat').addEventListener('input', totalFaixas);
+    $('#s-efd').addEventListener('change', function (ev) { importarEfdSimulador(ev.target.files).then(function () { ev.target.value = ''; }); });
   }
   function lerFaixas() {
-    var out = {}, tot = 0n, erro = null;
+    var out = {}, dev = {}, tot = 0n, totDev = 0n, erro = null;
     $$('#s-fat input').forEach(function (i) {
       var r = parseNum(i.value);
       i.setAttribute('aria-invalid', String(!r.ok));
       if (!r.ok && !erro) erro = i;
-      out[i.dataset.faixa] = r.ok && !r.vazio ? r.v : '0';
-      if (r.ok) tot += R.D(r.v);
+      var v = r.ok && !r.vazio ? r.v : '0';
+      if (i.dataset.faixa) { out[i.dataset.faixa] = v; tot += R.D(v); } else { dev[i.dataset.devol] = v; totDev += R.D(v); }
     });
-    return { fat: out, total: tot, erro: erro };
+    return { fat: out, devol: dev, total: tot, totalDevol: totDev, erro: erro };
   }
-  function totalFaixas() { var f = lerFaixas(); $('#s-bruto-total').textContent = brl(f.total); }
+  function totalFaixas() { var f = lerFaixas(); $('#s-bruto-total').textContent = brl(f.total); $('#s-devol-total').textContent = brl(f.totalDevol); }
+
+  // preenchimento a partir das EFD de 2026 (classifica vendas e devolucoes por NCM/NBS como seriam tributadas em 2027)
+  function decodificarTxt(bytes) {
+    if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return new TextDecoder('utf-8').decode(bytes.subarray(3));
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch (e) { return new TextDecoder('latin1').decode(bytes); }
+  }
+  async function importarEfdSimulador(files) {
+    var G = window.REGIME, Z = window.ESTOQUE, msg = $('#s-efd-res');
+    if (!G || !Z) { msg.textContent = 'Leitor de EFD indisponível.'; return; }
+    files = Array.prototype.slice.call(files || []); if (!files.length) return;
+    msg.textContent = 'Lendo ' + files.length + ' arquivo(s)…';
+    var lidos = [], ignorados = 0;
+    var tratar = function (nome, texto) {
+      var t = G.detectar(texto);
+      if (t === 'icms') lidos.push(G.lerEfdIcms(texto)); else if (t === 'contrib') lidos.push(G.lerEfdContrib(texto)); else ignorados++;
+    };
+    try {
+      for (var i = 0; i < files.length; i++) {
+        var bytes = new Uint8Array(await files[i].arrayBuffer());
+        if (/\.zip$/i.test(files[i].name)) {
+          var ents = Z.listarZip(bytes).filter(function (z) { return /\.txt$/i.test(z.nome) && !/__MACOSX/.test(z.nome); });
+          for (var k = 0; k < ents.length; k++) tratar(ents[k].nome, decodificarTxt(await ents[k].ler()));
+        } else tratar(files[i].name, decodificarTxt(bytes));
+      }
+    } catch (e) { msg.textContent = 'Não foi possível ler os arquivos: ' + e.message; return; }
+    if (!lidos.length) { msg.textContent = 'Nenhuma EFD ICMS/IPI ou EFD Contribuições reconhecida nos arquivos enviados.'; return; }
+    var c = G.consolidar(lidos), fx = G.faixasMensais(IDX, c);
+    var fmt = function (v) { return v ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; };
+    R.CATEGORIAS.forEach(function (cat) { $('#s-f-' + cat.k).value = fmt(fx.faturamento[cat.k]); $('#s-d-' + cat.k).value = fmt(fx.devolucoes[cat.k]); });
+    $('#s-icms').value = fmt(fx.icms); $('#s-iss').value = fmt(fx.iss); $('#s-cr').value = fmt(fx.compras);
+    if (c.nome && !$('#s-nome').value) $('#s-nome').value = c.nome;
+    if (c.regimePisCofins) { $('#s-regime').value = c.regimePisCofins === 'cumulativo' ? 'LP' : 'LR'; toggleSim(); }
+    totalFaixas();
+    var per = c.meses.length ? c.meses[0].split('-').reverse().join('/') + (c.meses.length > 1 ? ' a ' + c.meses[c.meses.length - 1].split('-').reverse().join('/') : '') : '';
+    var top = fx.detalheVendas.linhas.slice(0, 6).map(function (l) { return esc(l.codigo) + ' → ' + esc(l.cClassTrib) + ' (' + esc((R.CATEGORIAS.filter(function (x) { return x.k === l.faixa; })[0] || {}).nome || l.faixa) + ')'; }).join('; ');
+    msg.innerHTML = '<strong>Preenchido com a média mensal de ' + fx.meses + ' mês(es)</strong>' + (per ? ' (' + per + ')' : '') + ' de ' + lidos.length + ' arquivo(s) EFD' + (ignorados ? ' — ' + ignorados + ' arquivo(s) ignorado(s)' : '') + '. ' +
+      (fx.detalheVendas.total ? 'Classificação por NCM/serviço: ' + top + (fx.detalheVendas.linhas.length > 6 ? '…' : '') + '. ' : 'Sem itens por NCM nas EFD: o faturamento foi lançado como tributação integral. ') +
+      (fx.devolSemDetalhe > 0 ? 'Devoluções sem item identificado (' + brl(R.D(fx.devolSemDetalhe / fx.meses)) + '/mês) foram distribuídas pela proporção do faturamento. ' : '') +
+      'Revise os valores e clique em Calcular.' + (c.avisos.length ? ' Atenção: ' + esc(c.avisos.join(' ')) : '');
+  }
   function regimeHint(reg) {
     return {
       LP: 'Apura CBS/IBS pelo regime regular, com créditos sobre as compras.',
@@ -157,14 +199,14 @@
     var f = $('#f-sim'), msg = $('#s-msg'); msg.textContent = '';
     var nome = $('#s-nome').value.trim();
     if (!nome) { msg.textContent = 'Informe o nome da empresa.'; $('#s-nome').focus(); return; }
-    var v = lerCampos(f, ['descontos', 'icms', 'iss', 'rbt12', 'pCBSSN', 'pIBSSN', 'comprasRegular', 'comprasSimples', 'aliqCreditoSimples'], msg);
+    var v = lerCampos(f, ['icms', 'iss', 'rbt12', 'pCBSSN', 'pIBSSN', 'comprasRegular', 'comprasSimples', 'aliqCreditoSimples'], msg);
     if (!v) return;
     var fx = lerFaixas();
-    if (fx.erro) { msg.textContent = 'Valor inválido em "' + fx.erro.closest('.faixa').querySelector('label').firstChild.textContent + '". Use números, ex.: 12.345,67'; fx.erro.focus(); return; }
+    if (fx.erro) { msg.textContent = 'Valor inválido em "' + fx.erro.closest('.fx-lin').querySelector('label').firstChild.textContent + (fx.erro.dataset.devol ? ' (devoluções)' : '') + '". Use números, ex.: 12.345,67'; fx.erro.focus(); return; }
     if (!(fx.total > 0n)) { msg.textContent = 'Informe o faturamento do mês em pelo menos uma faixa (se não souber separar, use “Tributado integralmente”).'; $('#s-f-integral').focus(); return; }
     var reg = $('#s-regime').value;
     var e = {
-      regime: reg, faturamento: fx.fat, descontos: v.descontos,
+      regime: reg, faturamento: fx.fat, devolucoes: fx.devol,
       icms: reg === 'SN' ? 0 : v.icms, iss: reg === 'SN' ? 0 : v.iss,
       comprasRegular: v.comprasRegular, comprasSimples: v.comprasSimples, aliqCreditoSimples: v.aliqCreditoSimples,
       anexo: $('#s-anexo').value, rbt12: v.rbt12 || '', premissas: premissas()
@@ -199,13 +241,13 @@
 
     // quadro por faixa de tributacao
     var sn2 = r.regime === 'SN';
-    h += '<h3 class="sub">Cálculo por faixa de tributação</h3><div class="tbl-wrap"><table><thead><tr><th>Faixa</th><th class="v">Faturamento</th><th class="v">(−) Deduções</th><th class="v">Base de cálculo</th><th class="v">Alíq. efetiva CBS</th><th class="v">CBS</th><th class="v">IBS</th></tr></thead><tbody>';
+    h += '<h3 class="sub">Cálculo por faixa de tributação</h3><div class="tbl-wrap"><table><thead><tr><th>Faixa</th><th class="v">Faturamento</th><th class="v">(−) Devoluções</th><th class="v">(−) Deduções totais</th><th class="v">Base de cálculo</th><th class="v">Alíq. efetiva CBS</th><th class="v">CBS</th><th class="v">IBS</th></tr></thead><tbody>';
     var tf = 0n, td = 0n;
     r.porCategoria.forEach(function (c) {
       tf += c.faturamento; td += c.deducoes;
-      h += '<tr><td>' + esc(c.nome) + (sn2 ? '' : ' <span class="bdg' + (c.paga < 100 ? ' g' : '') + '">' + (c.k === 'naoInc' ? 'sem CBS/IBS' : 'paga ' + c.paga + '%') + '</span>') + '</td><td class="v">' + brl(c.faturamento) + '</td><td class="v">' + brl(c.deducoes) + '</td><td class="v">' + brl(c.base) + '</td><td class="v">' + pct(c.aliqCbs, 4) + '</td><td class="v">' + brl(c.cbs) + '</td><td class="v">' + brl(c.ibs) + '</td></tr>';
+      h += '<tr><td>' + esc(c.nome) + (sn2 ? '' : ' <span class="bdg' + (c.paga < 100 ? ' g' : '') + '">' + (c.k === 'naoInc' ? 'sem CBS/IBS' : 'paga ' + c.paga + '%') + '</span>') + '</td><td class="v">' + brl(c.faturamento) + '</td><td class="v">' + brl(c.devolucoes) + '</td><td class="v">' + brl(c.deducoes) + '</td><td class="v">' + brl(c.base) + '</td><td class="v">' + pct(c.aliqCbs, 4) + '</td><td class="v">' + brl(c.cbs) + '</td><td class="v">' + brl(c.ibs) + '</td></tr>';
     });
-    h += '<tr class="tot"><td>Total</td><td class="v">' + brl(tf) + '</td><td class="v">' + brl(td) + '</td><td class="v">' + brl(r.base) + '</td><td></td><td class="v">' + brl(r.cbsDebito) + '</td><td class="v">' + brl(r.ibsDebito) + '</td></tr></tbody></table></div>';
+    h += '<tr class="tot"><td>Total</td><td class="v">' + brl(tf) + '</td><td class="v">' + brl(r.descontos) + '</td><td class="v">' + brl(td) + '</td><td class="v">' + brl(r.base) + '</td><td></td><td class="v">' + brl(r.cbsDebito) + '</td><td class="v">' + brl(r.ibsDebito) + '</td></tr></tbody></table></div>';
 
     h += '<h3 class="sub">Memória de cálculo</h3><div class="tbl-wrap"><table class="mem"><tbody>';
     h += linha('Faturamento bruto (soma das faixas)', brl(r.receitaBruta));

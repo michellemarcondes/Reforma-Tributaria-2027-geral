@@ -285,7 +285,211 @@
     return out;
   }
 
-  var API = { lerXml: lerXml, listarZip: listarZip, decodificarXml: decodificarXml, consolidar: consolidar, classificar: classificar,
+  // ------------------------------------------------------------------ projecao com EFD (entradas, saidas e Bloco H)
+  function fnum(v) { if (v === undefined || v === null || v === '') return 0; var x = Number(String(v).replace(',', '.')); return isFinite(x) ? x : 0; }
+  function mesSped(dt) { return dt && dt.length === 8 ? dt.slice(4, 8) + '-' + dt.slice(2, 4) : ''; }
+  function proxMes(m) { var a = Number(m.slice(0, 4)), x = Number(m.slice(5, 7)) + 1; if (x > 12) { x = 1; a++; } return a + '-' + String(x).padStart(2, '0'); }
+  function ehVenda(cfop) { var c = String(cfop), r = Number(c.slice(1)); return c[0] >= '5' && ((r >= 101 && r <= 125) || (r >= 401 && r <= 405) || (r >= 651 && r <= 667)); }
+
+  /**
+   * Le uma EFD ICMS/IPI ou EFD Contribuicoes e extrai o movimento de estoque por item:
+   * entradas (C170 de C100 de entrada, com CFOP, CST do PIS, ICMS, IPI, ICMS-ST e rateio de frete/seguro/outras),
+   * saidas (C170 de venda com quantidade; C180 da NFC-e por valor) e inventario (H005/H010, so na EFD ICMS/IPI).
+   */
+  function lerEfdMov(texto) {
+    var tipo = /\n\|0110\|/.test(texto.slice(0, 20000)) ? 'contrib' : 'icms';
+    var o = { tipo: tipo, mes: '', cnpj: '', nome: '', itens: {}, part: {}, entradas: [], saidas: {}, inventario: null };
+    var doc = null, valido = true, entrada = false;
+    var fecharDoc = function () {
+      if (!doc || !doc.linhas.length) return;
+      var soma = doc.linhas.reduce(function (a, l) { return a + l.vProd; }, 0) || 1;
+      doc.linhas.forEach(function (l) { l.acessorios = doc.acess * l.vProd / soma; o.entradas.push(l); });
+    };
+    texto.split(/\r?\n/).forEach(function (ln) {
+      if (ln.charAt(0) !== '|') return;
+      var f = ln.split('|'), reg = f[1];
+      switch (reg) {
+        case '0000':
+          if (tipo === 'icms') { o.mes = mesSped(f[4]); o.nome = f[6]; o.cnpj = f[7]; }
+          else { o.mes = mesSped(f[7]); o.nome = f[8]; o.cnpj = f[9]; }
+          break;
+        case '0150': o.part[f[2]] = f[5] || f[6]; break;
+        case '0200': o.itens[f[2]] = { desc: f[3], unid: f[6], tipo: f[7], ncm: f[8] }; break;
+        case 'C100':
+          fecharDoc(); doc = null;
+          valido = ['02', '03', '04', '05'].indexOf(f[6]) < 0; entrada = f[2] === '0';
+          if (valido && entrada) doc = { chave: f[9], forn: o.part[f[4]] || '', acess: fnum(f[18]) + fnum(f[19]) + fnum(f[20]), linhas: [] };
+          break;
+        case 'C170':
+          if (!valido) break;
+          var cod = f[3], q = fnum(f[5]), v = fnum(f[7]) - fnum(f[8]);
+          if (entrada && doc) {
+            doc.linhas.push({ mes: o.mes, cod: cod, nItem: f[2], chave: doc.chave, forn: doc.forn, qtd: q, vProd: v, cfop: f[11], vICMS: fnum(f[15]), vICMSST: fnum(f[18]), vIPI: fnum(f[24]), cstPIS: f[25], vPIS: fnum(f[30]), vCOFINS: fnum(f[36]) });
+          } else if (!entrada && ehVenda(f[11])) {
+            var s = o.saidas[cod] = o.saidas[cod] || { qtd: 0, valor: 0, valorComQtd: 0, valorSemQtd: 0 };
+            s.qtd += q; s.valor += v; s.valorComQtd += v;
+          }
+          break;
+        case 'C180':   // NFC-e consolidada por item (EFD Contribuicoes): so valor
+          fecharDoc(); doc = null;
+          var s2 = o.saidas[f[5]] = o.saidas[f[5]] || { qtd: 0, valor: 0, valorComQtd: 0, valorSemQtd: 0 };
+          s2.valor += fnum(f[8]); s2.valorSemQtd += fnum(f[8]);
+          if (!o.itens[f[5]] && f[6]) o.itens[f[5]] = { desc: '', unid: '', tipo: '', ncm: f[6] };
+          break;
+        case 'H005': fecharDoc(); doc = null; o.inventario = { data: f[2], mesRef: mesSped(f[2]), valor: fnum(f[3]), motivo: f[4], itens: [] }; break;
+        case 'H010':
+          if (o.inventario && f[7] !== '2') o.inventario.itens.push({ cod: f[2], qtd: fnum(f[4]), valor: fnum(f[6]) });   // IND_PROP 2 = de terceiros
+          break;
+        default:
+          if (/^[A-Z]\d{3}$/.test(reg) && reg !== 'C170' && reg !== 'C190' && reg.charAt(0) !== 'C') { fecharDoc(); doc = null; }
+      }
+    });
+    fecharDoc();
+    return o;
+  }
+
+  var GRUPOS = ['elegivel', 'importacao', 'revisar', 'nao'];
+  /** Grupo de credito de uma linha de entrada da EFD (usa as mesmas regras dos XMLs). */
+  function grupoEntradaEfd(l, item, regime, crtFornecedor) {
+    var tp = String((item || {}).tipo || '');
+    if (tp === '07') return { g: 'nao', motivo: 'Uso e consumo (tipo do item 07)' };
+    if (tp === '08') return { g: 'nao', motivo: 'Ativo imobilizado (tipo do item 08)' };
+    if (tp === '09') return { g: 'nao', motivo: 'Serviço (tipo do item 09)' };
+    var c = classificar({ finNFe: '', emit: { crt: crtFornecedor || '' } }, { CFOP: l.cfop, cstPIS: l.cstPIS }, regime, true);
+    if (c.situacao === 'elegivel' && !c.importacao && (crtFornecedor === '1' || crtFornecedor === '2' || crtFornecedor === '4')) return { g: 'revisar', motivo: 'Fornecedor do Simples Nacional (XML da nota)' };
+    if (c.situacao === 'nao') return { g: 'nao', motivo: c.motivo };
+    if (c.situacao === 'revisar') return { g: 'revisar', motivo: c.motivo };
+    if (tp === '03' || tp === '04' || tp === '05') return { g: 'revisar', motivo: 'Produto em processo/acabado: o crédito alcança os insumos adquiridos' };
+    return { g: c.importacao ? 'importacao' : 'elegivel', motivo: c.motivo };
+  }
+
+  /**
+   * Projeta o estoque de 31/12/2026 a partir do movimento das EFD.
+   * opts: { regime, excluirIcms, incluirIpi, incluirSt, aliquota, mesesBase (1|2), inicio: 'bloco-h'|'xml'|'informado',
+   *         estoqueXml {g: valor} (estoque dos XMLs por grupo), estoqueInformado (R$ elegivel), crtPorChave {chave: crt}, fim: '2026-12' }
+   */
+  function projetarEstoque(movs, opts) {
+    opts = Object.assign({ regime: 'LP', excluirIcms: true, incluirIpi: true, incluirSt: true, aliquota: '9.25', mesesBase: 2, fim: '2026-12' }, opts || {});
+    var avisos = [], itens = {}, porMes = {}, inv = null, meses = {};
+    var vazio = function () { var x = {}; GRUPOS.forEach(function (g) { x[g] = { ent: 0, sai: 0, impPisCof: 0, impCusto: 0 }; }); return x; };
+    // 1) cadastro, inventario e entradas
+    movs.forEach(function (m) {
+      if (m.mes) meses[m.mes] = 1;
+      Object.keys(m.itens).forEach(function (k) { if (!itens[k] || !itens[k].ncm) itens[k] = Object.assign({ cod: k, entQtd: 0, entCusto: 0, grupos: {}, motivo: '', sai: {} }, itens[k] || {}, m.itens[k], { cod: k }); });
+      if (m.inventario && (!inv || m.inventario.data > inv.data)) inv = m.inventario;
+    });
+    var item = function (k) { return itens[k] = itens[k] || { cod: k, desc: '', ncm: '', tipo: '', entQtd: 0, entCusto: 0, grupos: {}, motivo: '', sai: {} }; };
+    movs.forEach(function (m) {
+      if (m.tipo !== 'icms' && movs.some(function (x) { return x.tipo === 'icms' && x.mes === m.mes; })) return;   // entradas: EFD ICMS tem prioridade
+      m.entradas.forEach(function (l) {
+        var it = item(l.cod), crt = (opts.crtPorChave || {})[l.chave] || (opts.crtPorCnpj || {})[l.forn];
+        var cl = grupoEntradaEfd(l, it, opts.regime, crt);
+        var custo = l.vProd + l.acessorios - (opts.excluirIcms ? l.vICMS : 0) + (opts.incluirIpi ? l.vIPI : 0) + (opts.incluirSt ? l.vICMSST : 0);
+        if (custo < 0) custo = 0;
+        var pm = porMes[l.mes] = porMes[l.mes] || vazio();
+        pm[cl.g].ent += custo;
+        if (cl.g === 'importacao') { pm[cl.g].impPisCof += l.vPIS + l.vCOFINS; pm[cl.g].impCusto += custo; }
+        it.entQtd += l.qtd; it.entCusto += custo; it.grupos[cl.g] = (it.grupos[cl.g] || 0) + custo; if (!it.motivo || cl.g !== 'elegivel') it.motivo = cl.motivo;
+      });
+    });
+    // 2) saidas por item (quantidade da EFD; se houver EFD ICMS e Contribuicoes no mesmo mes, usa a que tiver mais quantidade)
+    var saiMes = {};
+    movs.forEach(function (m) {
+      var ja = saiMes[m.mes];
+      var q = Object.keys(m.saidas).reduce(function (a, k) { return a + m.saidas[k].qtd + m.saidas[k].valor; }, 0);
+      if (!ja || q > ja.q) saiMes[m.mes] = { q: q, saidas: m.saidas };
+    });
+    // 3) grupo e custo medio de cada item (inventario + entradas do periodo)
+    var invItens = {}; if (inv) inv.itens.forEach(function (h) { invItens[h.cod] = h; });
+    Object.keys(itens).forEach(function (k) {
+      var it = itens[k], h = invItens[k];
+      var qt = it.entQtd + (h ? h.qtd : 0), vt = it.entCusto + (h ? h.valor : 0);
+      it.custoMedio = qt > 0 ? vt / qt : 0;
+      var gs = Object.keys(it.grupos).sort(function (a, b) { return it.grupos[b] - it.grupos[a]; });
+      if (gs.length) it.grupo = gs[0];
+      else {
+        var tp = String(it.tipo || '');
+        it.grupo = tp === '07' || tp === '08' || tp === '09' ? 'nao' : (tp === '03' || tp === '04' || tp === '05' ? 'revisar' : (opts.regime === 'LR' ? 'nao' : 'elegivel'));
+        it.motivo = tp === '07' ? 'Uso e consumo (tipo do item 07)' : tp === '08' ? 'Ativo imobilizado (tipo do item 08)' : 'Sem entrada no período: classificado pelo tipo do item';
+      }
+    });
+    // relacao custo/preco para saidas sem quantidade (NFC-e consolidada)
+    var custoVendas = 0, precoVendas = 0;
+    Object.keys(saiMes).forEach(function (mm) { var sm = saiMes[mm].saidas; Object.keys(sm).forEach(function (k) { var it = itens[k]; if (it && it.custoMedio && sm[k].qtd) { custoVendas += sm[k].qtd * it.custoMedio; precoVendas += sm[k].valorComQtd; } }); });
+    var ratioGlobal = precoVendas ? custoVendas / precoVendas : null;
+    var semCusto = 0;
+    Object.keys(saiMes).forEach(function (mm) {
+      var pm = porMes[mm] = porMes[mm] || vazio(), sm = saiMes[mm].saidas;
+      Object.keys(sm).forEach(function (k) {
+        var s = sm[k], it = item(k), g = it.grupo || 'elegivel';
+        var precoUnit = s.qtd ? s.valorComQtd / s.qtd : 0;
+        var custo = s.qtd * (it.custoMedio || 0);
+        if (s.valorSemQtd) {
+          var r = it.custoMedio && precoUnit ? it.custoMedio / precoUnit : ratioGlobal;
+          if (r === null) { semCusto += s.valorSemQtd; r = 1 - fnum(opts.margemBruta === undefined ? 30 : opts.margemBruta) / 100; }
+          custo += s.valorSemQtd * r;
+        }
+        if (s.qtd && !it.custoMedio) semCusto += s.valorComQtd;
+        pm[g].sai += custo;
+        it.sai[mm] = (it.sai[mm] || 0) + custo;
+      });
+    });
+    Object.keys(porMes).forEach(function (mm) { var tem = GRUPOS.some(function (g) { return porMes[mm][g].sai > 0; }); if (!tem) avisos.push('Sem saídas identificadas em ' + mm.split('-').reverse().join('/') + ' (envie a EFD Contribuições com os itens vendidos — C170/C180): o estoque desse mês pode estar superestimado.'); });
+    if (semCusto > 0) avisos.push('Há vendas de itens sem custo conhecido (sem entrada nem inventário nos arquivos): R$ ' + semCusto.toFixed(2).replace('.', ',') + ' em vendas foram convertidas a custo pela margem bruta informada.');
+    // 4) ponto de partida
+    var listaMeses = Object.keys(meses).filter(Boolean).sort();
+    if (!listaMeses.length) return { erro: 'Nenhuma EFD com período identificado.' };
+    var ultimo = listaMeses[listaMeses.length - 1];
+    var inicio = opts.inicio || (inv ? 'bloco-h' : (opts.estoqueXml ? 'xml' : 'informado'));
+    var saldo = {}; GRUPOS.forEach(function (g) { saldo[g] = 0; });
+    var linhas = [], mesInicio;
+    if (inicio === 'bloco-h' && inv) {
+      inv.itens.forEach(function (h) { var it = item(h.cod); saldo[it.grupo || 'elegivel'] += h.valor; });
+      mesInicio = proxMes(inv.mesRef);
+      // reconstitui mes a mes ate o ultimo mes com arquivo
+      for (var m = mesInicio; m <= ultimo; m = proxMes(m)) {
+        var pm = porMes[m];
+        if (!meses[m]) avisos.push('Falta a EFD de ' + m.split('-').reverse().join('/') + ': o mês foi preenchido com a média dos meses-base.');
+        linhas.push({ mes: m, tipo: meses[m] ? 'real' : 'media' });
+      }
+    } else {
+      if (inicio === 'bloco-h') avisos.push('Nenhum inventário (Bloco H) encontrado nas EFD; usado outro ponto de partida.');
+      inicio = inicio === 'bloco-h' ? (opts.estoqueXml ? 'xml' : 'informado') : inicio;
+      if (inicio === 'xml') GRUPOS.forEach(function (g) { saldo[g] = fnum((opts.estoqueXml || {})[g]); });
+      else saldo.elegivel = fnum(opts.estoqueInformado);
+      mesInicio = proxMes(ultimo);
+    }
+    // 5) medias dos meses-base
+    var base = listaMeses.slice(-Math.max(1, Math.min(2, opts.mesesBase || 2)));
+    var media = vazio();
+    base.forEach(function (m) { var pm = porMes[m] || vazio(); GRUPOS.forEach(function (g) { media[g].ent += pm[g].ent / base.length; media[g].sai += pm[g].sai / base.length; media[g].impPisCof += pm[g].impPisCof / base.length; media[g].impCusto += pm[g].impCusto / base.length; }); });
+    for (var p = proxMes(ultimo); p <= opts.fim; p = proxMes(p)) linhas.push({ mes: p, tipo: 'projecao' });
+    if (!linhas.some(function (l) { return l.mes >= mesInicio; }) && ultimo > opts.fim) avisos.push('Os arquivos já cobrem dezembro de 2026: nada a projetar.');
+    var saldoInicial = Object.assign({}, saldo);
+    linhas = linhas.filter(function (l) { return l.mes >= mesInicio && l.mes <= opts.fim; }).map(function (l) {
+      var src = l.tipo === 'real' ? (porMes[l.mes] || vazio()) : media, out = { mes: l.mes, tipo: l.tipo, grupos: {} };
+      GRUPOS.forEach(function (g) {
+        var ini = saldo[g], ent = src[g].ent, sai = src[g].sai, fim = Math.max(0, ini + ent - sai);
+        out.grupos[g] = { ini: ini, ent: ent, sai: sai, fim: fim, zerou: ini + ent - sai < 0 };
+        saldo[g] = fim;
+      });
+      return out;
+    });
+    // credito sobre o estoque projetado
+    var aliq = fnum(opts.aliquota) / 100;
+    var tImp = base.reduce(function (a, m) { var pm = porMes[m] || vazio(); return a + pm.importacao.impCusto; }, 0);
+    var tPis = base.reduce(function (a, m) { var pm = porMes[m] || vazio(); return a + pm.importacao.impPisCof; }, 0);
+    var ratioImp = tImp ? tPis / tImp : 0;
+    var credito = Math.round((saldo.elegivel * aliq + saldo.importacao * ratioImp) * 100) / 100;
+    var potencialRevisar = Math.round(saldo.revisar * aliq * 100) / 100;
+    var mesesBaseReais = base.map(function (m) { return { mes: m, grupos: porMes[m] || vazio() }; });
+    var listaItens = Object.keys(itens).map(function (k) { return itens[k]; }).filter(function (it) { return it.entCusto || invItens[it.cod] || Object.keys(it.sai).length; });
+    return { inicio: inicio, inventario: inv ? { data: inv.data, valor: inv.valor, itens: inv.itens.length } : null, mesInicio: mesInicio, ultimoMesArquivo: ultimo,
+      mesesArquivos: listaMeses, mesesBase: base, mesesBaseReais: mesesBaseReais, media: media, saldoInicial: saldoInicial, linhas: linhas,
+      final: saldo, credito: credito, ratioImportacao: ratioImp, potencialRevisar: potencialRevisar, itens: listaItens, avisos: avisos, ratioCustoPreco: ratioGlobal };
+  }
+
+  var API = { lerEfdMov: lerEfdMov, projetarEstoque: projetarEstoque, grupoEntradaEfd: grupoEntradaEfd, GRUPOS: GRUPOS, lerXml: lerXml, listarZip: listarZip, decodificarXml: decodificarXml, consolidar: consolidar, classificar: classificar,
     cfopEntrada: cfopEntrada, custoItem: custoItem, creditoProduto: creditoProduto, totalizar: totalizar, cronograma: cronograma,
     D: D, toStr: toStr, toNum: toNum, round2: round2, PARAM_PADRAO: PARAM_PADRAO };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.ESTOQUE = API;

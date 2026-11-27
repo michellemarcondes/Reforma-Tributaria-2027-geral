@@ -58,7 +58,7 @@
   // ---------------------------------------------------------------- EFD ICMS/IPI
   function lerEfdIcms(texto) {
     var o = { tipo: 'icms', cnpj: '', nome: '', mes: '', uf: '', vendas: 0, exportacao: 0, servicosIcms: 0, devolucoes: 0, compras: 0, icmsCompras: 0,
-      icmsRecolher: 0, ncmVendas: {}, b2b: 0, b2c: 0, itens: {}, part: {} };
+      icmsRecolher: 0, ncmVendas: {}, devolNcm: {}, b2b: 0, b2c: 0, itens: {}, part: {} };
     var c100 = null, docSaida = false, valido = true;
     texto.split(/\r?\n/).forEach(function (l) {
       if (l.charAt(0) !== '|') return;
@@ -76,6 +76,9 @@
           if (valido && docSaida) {
             var it = o.itens[f[3]] || {}, v = n(f[7]) - n(f[8]);
             if (grupoSaida(f[11]) === 'venda' && it.ncm) o.ncmVendas[it.ncm] = (o.ncmVendas[it.ncm] || 0) + v;
+          } else if (valido && grupoEntrada(f[11]) === 'devolucao') {
+            var itd = o.itens[f[3]] || {};
+            if (itd.ncm) o.devolNcm[itd.ncm] = (o.devolNcm[itd.ncm] || 0) + n(f[7]) - n(f[8]);
           }
           break;
         case 'C190':
@@ -104,7 +107,7 @@
   // ---------------------------------------------------------------- EFD Contribuicoes
   function lerEfdContrib(texto) {
     var o = { tipo: 'contrib', cnpj: '', nome: '', mes: '', regimePisCofins: '', vendasItens: 0, ncmVendas: {}, servicos: 0, servicosLst: {}, iss: 0,
-      servicosTomados: 0, comprasItens: 0, receitaF5: 0, pis: 0, cofins: 0, b2bMerc: 0, b2cMerc: 0, b2bServ: 0, b2cServ: 0, itens: {}, part: {} };
+      servicosTomados: 0, comprasItens: 0, receitaF5: 0, pis: 0, cofins: 0, devolNcm: {}, devolItens: 0, b2bMerc: 0, b2cMerc: 0, b2bServ: 0, b2cServ: 0, itens: {}, part: {} };
     var valido = true, saida = false, partDoc = '', tipoDoc = '';
     texto.split(/\r?\n/).forEach(function (l) {
       if (l.charAt(0) !== '|') return;
@@ -126,6 +129,7 @@
               var p = o.part[partDoc] || {}; if (p.cnpj) o.b2bMerc += v; else o.b2cMerc += v;
             }
           } else if (grupoEntrada(f[11]) === 'compra') o.comprasItens += v;
+          else if (grupoEntrada(f[11]) === 'devolucao') { o.devolItens += v; if (it.ncm) o.devolNcm[it.ncm] = (o.devolNcm[it.ncm] || 0) + v; }
           break;
         case 'A100': valido = f[5] !== '02'; saida = f[2] === '1'; partDoc = f[4]; tipoDoc = 'A';
           if (valido && saida) o.iss += n(f[21]);   // VL_ISS
@@ -259,7 +263,7 @@
     if (Object.keys(cnpjs).length > 1) avisos.push('Os arquivos pertencem a mais de uma empresa (raízes de CNPJ diferentes). Confira.');
     var meses = {};
     var out = { nome: '', cnpj: '', meses: [], receitaMesMerc: {}, receitaMesServ: {}, receitaMerc: 0, receitaServ: 0, exportacao: 0, devolucoes: 0,
-      compras: 0, servicosTomados: 0, icms: 0, iss: 0, pis2026: 0, cofins2026: 0, regimePisCofins: '', ncmVendas: {}, servicosLst: {}, b2b: 0, b2c: 0,
+      compras: 0, servicosTomados: 0, icms: 0, iss: 0, pis2026: 0, cofins2026: 0, regimePisCofins: '', ncmVendas: {}, devolNcm: {}, servicosLst: {}, b2b: 0, b2c: 0,
       dre: null, fontesDre: '', avisos: avisos, arquivos: L.map(function (x) { return { tipo: x.tipo, mes: x.mes, nome: x.arquivo || '' }; }) };
     L.forEach(function (x) { if (!out.nome && x.nome) { out.nome = x.nome; out.cnpj = x.cnpj; } });
     icms.forEach(function (x) {
@@ -268,8 +272,9 @@
       out.receitaMerc += x.vendas + x.exportacao; out.exportacao += x.exportacao; out.devolucoes += x.devolucoes;
       out.compras += x.compras - x.icmsCompras; out.icms += x.icmsRecolher; out.b2b += x.b2b; out.b2c += x.b2c;   // base do credito 2027: sem ICMS
       Object.keys(x.ncmVendas).forEach(function (k) { out.ncmVendas[k] = (out.ncmVendas[k] || 0) + x.ncmVendas[k]; });
+      Object.keys(x.devolNcm).forEach(function (k) { out.devolNcm[k] = (out.devolNcm[k] || 0) + x.devolNcm[k]; });
     });
-    var b2bMercC = 0, b2cMercC = 0, ncmC = {};
+    var b2bMercC = 0, b2cMercC = 0, ncmC = {}, devC = {}, devItensC = 0;
     con.forEach(function (x) {
       meses[x.mes] = 1;
       out.pis2026 += x.pis; out.cofins2026 += x.cofins; out.regimePisCofins = out.regimePisCofins || x.regimePisCofins;
@@ -279,6 +284,7 @@
       Object.keys(x.servicosLst).forEach(function (k) { out.servicosLst[k] = (out.servicosLst[k] || 0) + x.servicosLst[k]; });
       b2bMercC += x.b2bMerc; b2cMercC += x.b2cMerc;
       Object.keys(x.ncmVendas).forEach(function (k) { ncmC[k] = (ncmC[k] || 0) + x.ncmVendas[k]; });
+      Object.keys(x.devolNcm).forEach(function (k) { devC[k] = (devC[k] || 0) + x.devolNcm[k]; }); devItensC += x.devolItens;
       if (!icms.length) {                                     // sem EFD ICMS: receita e compras pela EFD Contribuicoes
         var rm = x.vendasItens || x.receitaF5;
         out.receitaMesMerc[x.mes] = (out.receitaMesMerc[x.mes] || 0) + rm; out.receitaMerc += rm; out.compras += x.comprasItens;
@@ -286,6 +292,8 @@
     });
     // a NF-e propria nao tem itens (C170) na EFD ICMS: a composicao por NCM vem da EFD Contribuicoes
     if (!Object.keys(out.ncmVendas).length) out.ncmVendas = ncmC;
+    if (!Object.keys(out.devolNcm).length) out.devolNcm = devC;
+    if (!icms.length && !out.devolucoes) out.devolucoes = devItensC;
     var icmsTemPart = icms.some(function (x) { return x.b2b + x.b2c > 0; });
     if (!icmsTemPart) { out.b2b += b2bMercC; out.b2c += b2cMercC; }
     // DRE: ECD tem prioridade; depois balancetes (soma)
@@ -477,7 +485,27 @@
     return out;
   }
 
-  var API = { trimestres: trimestres, detectar: detectar, lerEfdIcms: lerEfdIcms, lerEfdContrib: lerEfdContrib, lerEcd: lerEcd, lerBalancete: lerBalancete, consolidar: consolidar,
+  /**
+   * Faturamento e devolucoes por faixa de tributacao de 2027 (media mensal), a partir das EFD de 2026.
+   * A faixa de cada venda/devolucao vem do NCM (ou do item da LC 116 nos servicos); a receita sem detalhe
+   * por item segue a proporcao das vendas detalhadas.
+   */
+  function faixasMensais(idx, c) {
+    var meses = Math.max(1, c.meses.length);
+    var comp = composicaoBeneficios(idx, c.ncmVendas, c.servicosLst, c.exportacao);
+    var receita = c.receitaMerc + c.receitaServ, fat = {}, dev = {};
+    var pctFat = comp.total ? comp.pct : { integral: 1 };
+    Object.keys(pctFat).forEach(function (k) { fat[k] = receita * pctFat[k] / meses; });
+    var cd = composicaoBeneficios(idx, c.devolNcm || {}, {}, 0);
+    var devDet = cd.total, devTot = Math.max(c.devolucoes, devDet), resto = devTot - devDet;
+    Object.keys(cd.valores).forEach(function (k) { dev[k] = (dev[k] || 0) + cd.valores[k] / meses; });
+    if (resto > 0.005) Object.keys(pctFat).forEach(function (k) { dev[k] = (dev[k] || 0) + resto * pctFat[k] / meses; });
+    var r = function (o) { Object.keys(o).forEach(function (k) { o[k] = r2(o[k]); }); return o; };
+    return { meses: meses, faturamento: r(fat), devolucoes: r(dev), icms: r2(c.icms / meses), iss: r2(c.iss / meses),
+      compras: r2((c.compras + c.servicosTomados) / meses), detalheVendas: comp, detalheDevol: cd, devolSemDetalhe: r2(resto) };
+  }
+
+  var API = { faixasMensais: faixasMensais, trimestres: trimestres, detectar: detectar, lerEfdIcms: lerEfdIcms, lerEfdContrib: lerEfdContrib, lerEcd: lerEcd, lerBalancete: lerBalancete, consolidar: consolidar,
     classificarConta: classificarConta, composicaoBeneficios: composicaoBeneficios, calcular: calcular, PRES: PRES, DRE_CAMPOS: DRE_CAMPOS, grupoSaida: grupoSaida, grupoEntrada: grupoEntrada };
   if (typeof module !== 'undefined' && module.exports) { module.exports = API; return; }
   root.REGIME = API;

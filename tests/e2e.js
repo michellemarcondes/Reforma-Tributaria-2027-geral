@@ -21,7 +21,7 @@ const assert = (c, m) => { if (!c) throw new Error('FALHOU: ' + m); console.log(
   await page.fill('#s-nome', 'Comercial Exemplo Ltda.');
   await page.selectOption('#s-regime', 'LP');
   await page.fill('#s-f-integral', '100.000,00');
-  await page.fill('#s-desc', '2.000,00');
+  await page.fill('#s-d-integral', '2.000,00');
   await page.fill('#s-icms', '18.000,00');
   await page.fill('#s-cr', '50.000,00');
   await page.click('#f-sim button[type=submit]');
@@ -36,20 +36,21 @@ const assert = (c, m) => { if (!c) throw new Error('FALHOU: ' + m); console.log(
   await page.screenshot({ path: SHOTS + '/1-simulador-lp.png', fullPage: true });
 
   // formatos de numero: "100.000", "2.000", "18.000" (ponto de milhar sem virgula) e "50000"
-  await page.fill('#s-f-integral', '100.000'); await page.fill('#s-desc', '2.000'); await page.fill('#s-icms', '18.000'); await page.fill('#s-cr', '50000');
+  await page.fill('#s-f-integral', '100.000'); await page.fill('#s-d-integral', '2.000'); await page.fill('#s-icms', '18.000'); await page.fill('#s-cr', '50000');
   await page.click('#f-sim button[type=submit]');
   txt = nt(await page.textContent('#s-res'));
   assert(txt.includes('R$ 80.000,00') && txt.includes('R$ 3.390,00'), 'números "100.000", "2.000", "18.000" e "50000" lidos corretamente (base R$ 80.000,00)');
-  assert(nt(await page.inputValue('#s-desc')) === '2.000,00', 'campo reformatado ao sair: "2.000" -> "2.000,00"');
+  assert(nt(await page.inputValue('#s-d-integral')) === '2.000,00', 'campo reformatado ao sair: "2.000" -> "2.000,00"');
   for (const [entrada, esperado] of [['1.234.567,89', '1.234.567,89'], ['1234567.89', '1.234.567,89'], ['1,234,567.89', '1.234.567,89'], ['2000', '2.000,00'], ['2000,5', '2.000,50'], ['R$ 750', '750,00']]) {
-    await page.fill('#s-f-integral', entrada); await page.focus('#s-desc');
+    await page.fill('#s-f-integral', entrada); await page.focus('#s-d-integral');
     assert(nt(await page.inputValue('#s-f-integral')) === esperado, 'formato "' + entrada + '" interpretado como ' + esperado);
   }
-  await page.fill('#s-f-integral', '100.000,00'); await page.fill('#s-desc', '2.000,00'); await page.fill('#s-icms', '18.000,00'); await page.fill('#s-cr', '50.000,00');
+  await page.fill('#s-f-integral', '100.000,00'); await page.fill('#s-d-integral', '2.000,00'); await page.fill('#s-icms', '18.000,00'); await page.fill('#s-cr', '50.000,00');
 
   // faixas: 50 mil integral + 50 mil com redução de 60% (deduções rateadas pro rata)
   await page.fill('#s-f-integral', '50.000'); await page.fill('#s-f-red60', '50.000');
-  await page.focus('#s-desc');
+  await page.fill('#s-d-integral', '1.000'); await page.fill('#s-d-red60', '1.000');
+  await page.focus('#s-icms');
   assert(nt(await page.textContent('#s-bruto-total')) === 'R$ 100.000,00', 'faixas: faturamento bruto somado automaticamente (R$ 100.000,00)');
   await page.click('#f-sim button[type=submit]');
   txt = nt(await page.textContent('#s-res'));
@@ -60,21 +61,45 @@ const assert = (c, m) => { if (!c) throw new Error('FALHOU: ' + m); console.log(
   // cenario misto: 60 mil integral, 20 mil red60, 5 mil red80, 10 mil aliquota zero, 5 mil isento
   await page.fill('#s-f-integral', '60.000'); await page.fill('#s-f-red60', '20.000'); await page.fill('#s-f-red80', '5.000');
   await page.fill('#s-f-zero', '10.000'); await page.fill('#s-f-naoInc', '5.000');
-  await page.fill('#s-desc', '1.000'); await page.fill('#s-icms', '9.000'); await page.fill('#s-cr', '40.000');
+  await page.fill('#s-d-integral', '600'); await page.fill('#s-d-red60', '200'); await page.fill('#s-d-red80', '50'); await page.fill('#s-d-zero', '100'); await page.fill('#s-d-naoInc', '50');
+  await page.fill('#s-icms', '9.000'); await page.fill('#s-cr', '40.000');
   await page.click('#f-sim button[type=submit]');
   txt = nt(await page.textContent('#s-res'));
   assert(txt.includes('R$ 6.102,00') && txt.includes('R$ 813,60') && txt.includes('R$ 101,70'), 'misto: CBS por faixa 6.102,00 / 813,60 / 101,70');
   assert(txt.includes('R$ 2.497,30') && txt.includes('R$ 22,10') && txt.includes('R$ 2.519,40'), 'misto: CBS R$ 2.497,30 + IBS R$ 22,10 = R$ 2.519,40');
   await page.screenshot({ path: SHOTS + '/1b-simulador-faixas.png', fullPage: true });
-  for (const k of ['red60', 'red80', 'zero', 'naoInc']) await page.fill('#s-f-' + k, '');
-  await page.fill('#s-f-integral', '100.000,00'); await page.fill('#s-desc', '2.000,00'); await page.fill('#s-icms', '18.000,00'); await page.fill('#s-cr', '50.000,00');
+  for (const k of ['red60', 'red80', 'zero', 'naoInc']) { await page.fill('#s-f-' + k, ''); await page.fill('#s-d-' + k, ''); }
+  await page.fill('#s-f-integral', '100.000,00'); await page.fill('#s-d-integral', '2.000,00'); await page.fill('#s-icms', '18.000,00'); await page.fill('#s-cr', '50.000,00');
+
+  // devolucao na faixa correta: 50 mil integral + 50 mil red60, devolucao de 5 mil so na faixa red60
+  await page.fill('#s-f-integral', '50.000'); await page.fill('#s-f-red60', '50.000'); await page.fill('#s-d-integral', ''); await page.fill('#s-d-red60', '5.000');
+  await page.fill('#s-icms', ''); await page.fill('#s-cr', '');
+  await page.click('#f-sim button[type=submit]');
+  txt = nt(await page.textContent('#s-res'));
+  // integral: 50.000 x 11,3% = 5.650 ; red60: 45.000 x 4,52% = 2.034 -> CBS 7.684,00 ; IBS 50 + 18 = 68
+  assert(txt.includes('R$ 7.684,00') && txt.includes('R$ 68,00') && nt(await page.textContent('#s-devol-total')) === 'R$ 5.000,00', 'devolução abatida só na faixa red60: CBS R$ 7.684,00 (não rateada)');
+  // preenchimento pela EFD (12 meses de EFD ICMS/IPI + Contribuicoes)
+  if (process.env.SPED_DIR) {
+    const sped = require('fs').readdirSync(process.env.SPED_DIR).filter(f => /^efd-/.test(f)).map(f => require('path').join(process.env.SPED_DIR, f));
+    await page.setInputFiles('#s-efd', sped);
+    await page.waitForFunction(() => /Preenchido com a média mensal/.test(document.querySelector('#s-efd-res').textContent));
+    const val = async id => nt(await page.inputValue(id));
+    assert(await val('#s-f-integral') === '50.000,00' && await val('#s-f-zero') === '30.000,00' && await val('#s-f-red60') === '20.000,00' && await val('#s-f-red30') === '10.000,00' && await val('#s-f-naoInc') === '833,33',
+      'EFD → faixas (média de 12 meses): notebook integral 50 mil, arroz alíquota zero 30 mil, sabonete −60% 20 mil, contabilidade −30% 10 mil, exportação 833,33');
+    assert(await val('#s-d-red60') === '1.000,00' && await val('#s-d-integral') === '' && await val('#s-icms') === '12.000,00' && await val('#s-iss') === '500,00' && await val('#s-cr') === '44.000,00',
+      'EFD → devolução do sabonete na faixa −60% (C170), ICMS (E110), ISS (A100) e compras sem ICMS');
+    assert((await page.inputValue('#s-regime')) === 'LP' && /12 mês/.test(nt(await page.textContent('#s-efd-res'))), 'regime detectado (PIS/Cofins cumulativo → Presumido) e período informado');
+    for (const k of ['zero', 'red60', 'red30', 'naoInc', 'integral']) { await page.fill('#s-f-' + k, ''); await page.fill('#s-d-' + k, ''); }
+    await page.fill('#s-cr', ''); await page.fill('#s-iss', '');
+  }
+  await page.fill('#s-f-integral', '100.000,00'); await page.fill('#s-d-integral', '2.000,00'); await page.fill('#s-icms', '18.000,00'); await page.fill('#s-cr', '50.000,00'); await page.fill('#s-f-red60', ''); await page.fill('#s-d-red60', '');
 
   // Simples Nacional padrão
   await page.selectOption('#s-regime', 'SN');
   assert(await page.isHidden('#s-icms'), 'SN: campo ICMS oculto');
   await page.selectOption('#s-anexo', 'I');
   await page.fill('#s-rbt12', '150.000,00');
-  await page.fill('#s-f-integral', '12.500,00'); await page.fill('#s-desc', '');
+  await page.fill('#s-f-integral', '12.500,00'); await page.fill('#s-d-integral', '');
   assert(await page.isVisible('#s-sn-nota'), 'SN: aviso de que reduções não alteram o DAS');
   await page.click('#f-sim button[type=submit]');
   txt = nt(await page.textContent('#s-res'));

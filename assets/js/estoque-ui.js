@@ -21,7 +21,14 @@
   }
   var MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
-  var st = { lidas: [], arquivos: 0, erros: [], ajustes: {}, res: null, tot: null, filtro: 'todos', busca: '', limite: 300, ocupado: false };
+  var st = { lidas: [], efd: [], arquivos: 0, erros: [], ajustes: {}, res: null, tot: null, proj: null, filtro: 'todos', busca: '', limite: 300, ocupado: false };
+  function decTxt(bytes) { try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch (e) { return new TextDecoder('latin1').decode(bytes); } }
+  function lerTexto(nome, bytes) {
+    var t = decTxt(bytes);
+    if (!/^\s*\|0000\|/.test(t.slice(0, 50))) { st.erros.push({ arquivo: nome, motivo: 'arquivo .txt que não é EFD (SPED)' }); return; }
+    if (/^\s*\|0000\|LECD\|/.test(t.slice(0, 50))) { st.erros.push({ arquivo: nome, motivo: 'ECD não é usada nesta aba (use EFD ICMS/IPI e EFD Contribuições)' }); return; }
+    var m = E.lerEfdMov(t); m.arquivo = nome; st.efd.push(m);
+  }
 
   function param() {
     var a = num($('#e-aliq').value, true);
@@ -37,8 +44,8 @@
   }
   async function lerArquivos(lista) {
     if (st.ocupado) return;
-    var files = Array.prototype.slice.call(lista || []).filter(function (f) { return /\.(xml|zip)$/i.test(f.name); });
-    if (!files.length) { $('#e-msg').textContent = 'Nenhum arquivo .xml ou .zip encontrado na seleção.'; return; }
+    var files = Array.prototype.slice.call(lista || []).filter(function (f) { return /\.(xml|zip|txt)$/i.test(f.name); });
+    if (!files.length) { $('#e-msg').textContent = 'Nenhum arquivo .xml, .txt (EFD) ou .zip encontrado na seleção.'; return; }
     st.ocupado = true; $('#e-msg').textContent = '';
     var feitos = 0, total = files.length, novos = 0;
     try {
@@ -47,29 +54,38 @@
         try {
           var bytes = new Uint8Array(await f.arrayBuffer());
           if (/\.zip$/i.test(f.name)) {
-            var ents = E.listarZip(bytes).filter(function (z) { return /\.xml$/i.test(z.nome) && !/(^|\/)__MACOSX\//.test(z.nome); });
+            var ents = E.listarZip(bytes).filter(function (z) { return /\.(xml|txt)$/i.test(z.nome) && !/(^|\/)__MACOSX\//.test(z.nome); });
             total += ents.length;
             for (var k = 0; k < ents.length; k++) {
-              try { st.lidas.push(E.lerXml(E.decodificarXml(await ents[k].ler()), f.name + ' › ' + ents[k].nome)); novos++; }
+              try { var eb = await ents[k].ler(); if (/\.txt$/i.test(ents[k].nome)) lerTexto(f.name + ' › ' + ents[k].nome, eb); else st.lidas.push(E.lerXml(E.decodificarXml(eb), f.name + ' › ' + ents[k].nome)); novos++; }
               catch (e2) { st.erros.push({ arquivo: f.name + ' › ' + ents[k].nome, motivo: 'não foi possível ler (' + e2.message + ')' }); }
               feitos++; st.arquivos++;
               if (feitos % 50 === 0) { progresso(feitos, total, 'Lendo ' + feitos + ' de ' + total + ' arquivos…'); await pausa(); }
             }
           } else {
-            st.lidas.push(E.lerXml(E.decodificarXml(bytes), f.webkitRelativePath || f.name)); novos++; st.arquivos++;
+            if (/\.txt$/i.test(f.name)) lerTexto(f.webkitRelativePath || f.name, bytes); else st.lidas.push(E.lerXml(E.decodificarXml(bytes), f.webkitRelativePath || f.name)); novos++; st.arquivos++;
           }
         } catch (e) { st.erros.push({ arquivo: f.name, motivo: 'não foi possível ler (' + e.message + ')' }); }
         feitos++;
         if (feitos % 50 === 0) { progresso(feitos, total, 'Lendo ' + feitos + ' de ' + total + ' arquivos…'); await pausa(); }
       }
-      progresso(total, total, novos + ' XML(s) lidos nesta seleção.');
+      progresso(total, total, novos + ' arquivo(s) lidos nesta seleção.');
     } finally { st.ocupado = false; }
     recalcular(true);
   }
 
   // ---------------------------------------------------------------- calculo
   function recalcular(detectar) {
-    if (!st.lidas.length) { $('#e-res').hidden = true; $('#e-inv-card').hidden = true; $('#e-lidos').textContent = ''; return; }
+    if (!st.lidas.length && !st.efd.length) { $('#e-res').hidden = true; $('#e-inv-card').hidden = true; $('#e-proj-card').hidden = true; $('#e-lidos').textContent = ''; return; }
+    prepararProjecao();
+    if (!st.lidas.length) {
+      st.res = null; $('#e-inv-card').hidden = true;
+      var ef0 = st.efd[0] || {};
+      if (!$('#e-nome').dataset.manual && ef0.nome) $('#e-nome').value = ef0.nome;
+      if (!$('#e-cnpj').dataset.manual && ef0.cnpj) $('#e-cnpj').value = formatarCnpj(ef0.cnpj);
+      $('#e-lidos').innerHTML = resumoEfd();
+      renderTudo(); return;
+    }
     var cnpj = $('#e-cnpj').value.replace(/\D/g, '');
     st.res = E.consolidar(st.lidas, param(), detectar && !$('#e-cnpj').dataset.manual ? '' : cnpj);
     if (!$('#e-cnpj').dataset.manual) $('#e-cnpj').value = formatarCnpj(st.res.cnpjEmpresa);
@@ -82,7 +98,7 @@
     var r = st.res.resumo;
     $('#e-lidos').innerHTML = '<strong>' + st.arquivos + '</strong> arquivo(s) lido(s) · <strong>' + r.notasValidas + '</strong> nota(s) de compra válidas · ' +
       r.canceladas + ' cancelada(s) · ' + r.duplicadas + ' duplicada(s) · ' + r.saidasProprias + ' venda(s) da própria empresa ignorada(s)' +
-      ((st.res.ignoradas.length + st.erros.length) ? ' · ' + (st.res.ignoradas.length + st.erros.length) + ' arquivo(s) não aproveitado(s)' : '');
+      ((st.res.ignoradas.length + st.erros.length) ? ' · ' + (st.res.ignoradas.length + st.erros.length) + ' arquivo(s) não aproveitado(s)' : '') + (st.efd.length ? '<br>' + resumoEfd() : '');
     $('#e-inv-card').hidden = false;
     renderTudo();
   }
@@ -96,8 +112,12 @@
   // ---------------------------------------------------------------- renderizacao
   function renderTudo() {
     var el = $('#e-res');
+    if (!st.res) {
+      el.innerHTML = '<div id="e-sum"></div><div id="e-ign"></div><div class="btns no-print"><button class="btn sec" type="button" id="e-csv">Exportar memória de cálculo (CSV)</button><button class="btn sec" type="button" onclick="window.print()">Imprimir / salvar PDF</button></div>';
+      el.hidden = false; renderResumo(); renderIgnorados(); return;
+    }
     el.innerHTML = '<div id="e-sum"></div>' +
-      '<h3 class="sub">Produtos das notas <span class="nome" id="e-cnt-prod" style="font-weight:400;color:var(--ink3)"></span></h3>' +
+      '<h3 class="sub">Produtos das notas (XML)' + (st.efd.length ? ' — base do estoque quando o ponto de partida é “estoque dos XMLs”' : '') + ' <span class="nome" id="e-cnt-prod" style="font-weight:400;color:var(--ink3)"></span></h3>' +
       '<div class="tools no-print"><input id="e-busca" placeholder="Buscar por código, descrição, NCM ou fornecedor" aria-label="Buscar produtos">' +
       '<div class="fbtns" role="group" aria-label="Filtrar por situação">' +
       [['todos', 'Todos'], ['elegivel', 'Elegíveis'], ['revisar', 'Em revisão'], ['nao', 'Sem crédito']].map(function (b) { return '<button class="fb" type="button" data-f="' + b[0] + '" aria-pressed="' + (st.filtro === b[0]) + '">' + b[1] + '</button>'; }).join('') + '</div></div>' +
@@ -111,11 +131,13 @@
   }
 
   function renderResumo() {
+    if (st.efd.length) { renderProjecao(); return; }
     var t = totais(), mes = Number($('#e-mes').value), cr = E.cronograma(t.credito, mes, 2027);
     var nm = $('#e-nome').value.trim();
     var nEle = 0, nRev = 0, nNao = 0;
     st.res.produtos.forEach(function (p) { if (p.situacao === 'elegivel') nEle++; else if (p.situacao === 'revisar') nRev++; else nNao++; });
-    var h = '<h2 class="sec">Resultado' + (nm ? ' — ' + esc(nm) : '') + ' <span class="cnt">estoque em 1º/01/2027</span></h2>';
+    var h = '<h2 class="sec">Resultado' + (nm ? ' — ' + esc(nm) : '') + ' <span class="cnt">estoque em 1º/01/2027</span></h2>' +
+      '<div class="box alert"><h2><span class="ic">⚠️</span>Cálculo sem EFD: não considera as saídas</h2><p>Sem a EFD, o site supõe que <strong>tudo o que foi comprado nas notas ainda está em estoque</strong>, o que tende a superestimar o crédito. Envie também a <strong>EFD ICMS/IPI e a EFD Contribuições</strong> dos meses de 2026 para projetar o inventário de 31/12/2026 com as entradas e as saídas, ou ajuste as quantidades no item 3.</p></div>';
     h += '<div class="counts">' +
       '<div class="ct a"><div class="n">' + brl(t.credito) + '</div><div class="l">Crédito presumido de CBS (total)</div></div>' +
       '<div class="ct b"><div class="n">' + brl(cr[0] ? cr[0].valor : 0n) + '</div><div class="l">Parcela mensal (12×), a partir de ' + MESES[mes - 1] + '/2027</div></div>' +
@@ -145,6 +167,97 @@
       '<li><strong>Use em 12 parcelas mensais de ' + brl(cr[0] ? cr[0].valor : 0n) + '</strong>, de ' + MESES[mes - 1] + '/2027 a ' + MESES[cr[11].mes - 1] + '/' + cr[11].ano + ', abatendo somente a CBS devida — sem compensar com outros tributos nem pedir ressarcimento.</li>' +
       '<li><strong>Guarde a documentação</strong> (inventário, notas fiscais e esta memória de cálculo) pelo prazo decadencial.</li></ol></div>';
     $('#e-sum').innerHTML = h;
+  }
+
+  // ---------------------------------------------------------------- projecao com EFD
+  function mesBR(m) { var x = m.split('-'); return MESES[Number(x[1]) - 1] + '/' + x[0]; }
+  function resumoEfd() {
+    var meses = {}, icms = 0, con = 0, inv = null;
+    st.efd.forEach(function (m) { meses[m.mes] = 1; if (m.tipo === 'icms') icms++; else con++; if (m.inventario) inv = m.inventario; });
+    var l = Object.keys(meses).sort();
+    return '<strong>' + st.efd.length + '</strong> EFD lida(s): ' + icms + ' ICMS/IPI · ' + con + ' Contribuições · ' + (l.length ? 'de ' + mesBR(l[0]) + ' a ' + mesBR(l[l.length - 1]) : '') +
+      (inv ? ' · inventário (Bloco H) de ' + inv.data.replace(/^(\d{2})(\d{2})(\d{4})$/, '$1/$2/$3') : ' · sem inventário (Bloco H)');
+  }
+  function prepararProjecao() {
+    var card = $('#e-proj-card'); if (!card) return;
+    card.hidden = !st.efd.length; if (!st.efd.length) return;
+    var meses = {}, temH = false;
+    st.efd.forEach(function (m) { if (m.mes) meses[m.mes] = 1; if (m.inventario) temH = true; });
+    var l = Object.keys(meses).sort(), ini = $('#e-ini'), atual = ini.value;
+    ini.innerHTML = (temH ? '<option value="bloco-h">Inventário do Bloco H, atualizado mês a mês pelas EFD</option>' : '') +
+      (st.lidas.length ? '<option value="xml">Estoque calculado pelos XMLs (item 4), no fim de ' + (l.length ? mesBR(l[l.length - 1]) : 'último mês') + '</option>' : '') +
+      '<option value="informado">Valor informado do estoque no fim de ' + (l.length ? mesBR(l[l.length - 1]) : 'último mês') + '</option>';
+    if (atual && ini.querySelector('option[value="' + atual + '"]')) ini.value = atual;
+    $('#e-estinf-w').hidden = ini.value !== 'informado';
+    var b = $('#e-base'), ab = b.value;
+    b.innerHTML = l.length >= 2 ? '<option value="2">2 meses: ' + mesBR(l[l.length - 2]) + ' e ' + mesBR(l[l.length - 1]) + '</option><option value="1">1 mês: ' + mesBR(l[l.length - 1]) + '</option>' : '<option value="1">1 mês: ' + (l.length ? mesBR(l[0]) : '') + '</option>';
+    if (ab && b.querySelector('option[value="' + ab + '"]')) b.value = ab;
+  }
+  function estoqueXmlPorGrupo() {
+    if (!st.res) return null;
+    var p = param(), g = { elegivel: 0, importacao: 0, revisar: 0, nao: 0 };
+    st.res.produtos.forEach(function (x) {
+      var c = E.creditoProduto(x, p), v = E.toNum(c.valorEstoque);
+      if (x.situacao === 'nao') g.nao += v; else if (x.situacao === 'revisar' && !x.incluir) g.revisar += v; else if (!x.incluir) g.nao += v; else if (x.importacao) g.importacao += v; else g.elegivel += v;
+    });
+    return g;
+  }
+  function calcularProjecao() {
+    var crtCh = {}, crtCn = {}, emp = ($('#e-cnpj').value || '').replace(/\D/g, '');
+    st.lidas.forEach(function (n) { if (n.tipo === 'nfe' && n.emit && n.emit.cnpj !== emp) { crtCh[n.chave] = n.emit.crt; crtCn[n.emit.cnpj] = n.emit.crt; } });
+    var p = param(), est = num($('#e-estinf').value), mg = num($('#e-margem').value, true);
+    st.proj = E.projetarEstoque(st.efd, { regime: p.regime, excluirIcms: p.excluirIcms, incluirIpi: p.incluirIpi, incluirSt: p.incluirSt, aliquota: p.aliquota,
+      mesesBase: Number($('#e-base').value) || 2, inicio: $('#e-ini').value || undefined, estoqueInformado: est.ok ? est.v : 0,
+      margemBruta: mg.ok && !mg.vazio ? mg.v : 30, crtPorChave: crtCh, crtPorCnpj: crtCn, estoqueXml: estoqueXmlPorGrupo() });
+    return st.proj;
+  }
+  var NOMES_G = { elegivel: 'Elegível (mercado interno)', importacao: 'Importados (PIS/Cofins-Importação)', revisar: 'Em revisão (Simples, CFOP atípico, produção)', nao: 'Sem crédito (alíquota zero, uso e consumo, imobilizado…)' };
+  function renderProjecao() {
+    var el = $('#e-sum'), pr = calcularProjecao(), nm = $('#e-nome').value.trim();
+    if (pr.erro) { el.innerHTML = '<div class="box alert"><p>' + esc(pr.erro) + '</p></div>'; return; }
+    var aliq = E.toNum(E.D(param().aliquota)) / 100, out = num($('#e-outros').value), outros = out.ok ? Number(out.v) : 0;
+    var credito = pr.credito + Math.round(outros * aliq * 100) / 100, elegFinal = pr.final.elegivel + outros;
+    var mesAp = Number($('#e-mes').value), cr = E.cronograma(E.D(credito.toFixed(2)), mesAp, 2027);
+    var R = function (v) { return nf.format(v || 0); };
+    var med = pr.media.elegivel, ult = pr.linhas.filter(function (l) { return l.tipo !== 'projecao'; }).pop();
+    var proj = pr.linhas.filter(function (l) { return l.tipo === 'projecao'; });
+    var h = '<h2 class="sec">Projeção do inventário de abertura' + (nm ? ' — ' + esc(nm) : '') + ' <span class="cnt">estoque projetado para 31/12/2026</span></h2>';
+    h += '<div class="counts">' +
+      '<div class="ct"><div class="n">' + R(elegFinal + pr.final.importacao) + '</div><div class="l">Inventário de abertura projetado com direito a crédito (31/12/2026)</div></div>' +
+      '<div class="ct a"><div class="n">' + R(credito) + '</div><div class="l">Crédito presumido de CBS projetado</div></div>' +
+      '<div class="ct b"><div class="n">' + brl(cr[0] ? cr[0].valor : 0n) + '</div><div class="l">Parcela mensal (12×), a partir de ' + MESES[mesAp - 1] + '/2027</div></div>' +
+      '<div class="ct c"><div class="n">' + R(pr.final.nao) + '</div><div class="l">Estoque projetado sem direito a crédito</div></div></div>';
+    var partida = pr.inicio === 'bloco-h' ? 'o inventário do Bloco H de ' + pr.inventario.data.replace(/^(\d{2})(\d{2})(\d{4})$/, '$1/$2/$3') + ', atualizado mês a mês com as entradas e saídas das EFD até ' + mesBR(pr.ultimoMesArquivo)
+      : pr.inicio === 'xml' ? 'o estoque calculado pelos XMLs, considerado no fim de ' + mesBR(pr.ultimoMesArquivo) : 'o valor de estoque informado para o fim de ' + mesBR(pr.ultimoMesArquivo);
+    h += '<div class="box info"><h2><span class="ic">📈</span>Isto é uma projeção</h2><p>O inventário de 31/12/2026 ainda não foi levantado. O ponto de partida é ' + partida + '. ' +
+      'Nos meses-base (' + pr.mesesBase.map(mesBR).join(' e ') + ') a empresa teve, em média, <strong>' + R(med.ent) + ' de entradas</strong> e <strong>' + R(med.sai) + ' de saídas a custo</strong> por mês em itens com direito a crédito. ' +
+      (proj.length ? 'Seguindo essa média, ' + proj.map(function (l, i) { var g = l.grupos.elegivel; return (i ? mesBR(l.mes) + ' começa com ' + R(g.ini) + ', recebe ' + R(g.ent) + ', baixa ' + R(g.sai) + ' e termina com <strong>' + R(g.fim) + '</strong>' : mesBR(l.mes) + ' deve terminar com <strong>' + R(g.fim) + '</strong> (' + R(g.ini) + ' + ' + R(g.ent) + ' − ' + R(g.sai) + ')'); }).join('; ') + ' — o <strong>inventário de abertura projetado</strong>.' : 'Os arquivos já chegam a dezembro de 2026: o estoque final é o apurado pelas EFD.') + '</p>' +
+      '<p>Quando o inventário real de 31/12/2026 for levantado, substitua a projeção pelo valor apurado.</p></div>';
+    if (pr.potencialRevisar > 0) h += '<div class="box alert"><h2><span class="ic">🔎</span>Itens em revisão</h2><p>Estoque projetado de ' + R(pr.final.revisar) + ' em itens de fornecedores do Simples Nacional, CFOP atípico ou em produção (crédito potencial de ' + R(pr.potencialRevisar) + ', <strong>não somado</strong>).</p></div>';
+    if (pr.avisos.length) h += '<div class="box plain"><h2>Avisos</h2><ul>' + pr.avisos.map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('') + '</ul></div>';
+    h += '<h3 class="sub">Evolução do estoque com direito a crédito, mês a mês</h3><div class="tbl-wrap"><table id="e-proj-tab"><thead><tr><th>Mês</th><th>Origem</th><th class="v">Estoque inicial</th><th class="v">(+) Entradas a custo</th><th class="v">(−) Saídas a custo</th><th class="v">Estoque final</th></tr></thead><tbody>' +
+      pr.linhas.map(function (l) {
+        var g = { ini: 0, ent: 0, sai: 0, fim: 0 };
+        ['elegivel', 'importacao'].forEach(function (k) { var x = l.grupos[k]; g.ini += x.ini; g.ent += x.ent; g.sai += x.sai; g.fim += x.fim; });
+        var org = l.tipo === 'real' ? '<span class="tag g">EFD</span>' : l.tipo === 'media' ? '<span class="tag n">média (sem EFD)</span>' : '<span class="tag">projeção</span>';
+        return '<tr' + (l.tipo === 'projecao' ? ' class="sub"' : '') + '><td>' + mesBR(l.mes) + '</td><td>' + org + '</td><td class="v">' + R(g.ini) + '</td><td class="v">' + R(g.ent) + '</td><td class="v">' + R(g.sai) + '</td><td class="v">' + R(g.fim) + '</td></tr>';
+      }).join('') + (outros ? '<tr><td colspan="5">(+) Outros estoques sem nota informados</td><td class="v">' + R(outros) + '</td></tr>' : '') +
+      '<tr class="tot"><td colspan="5">Inventário de abertura projetado com direito a crédito (31/12/2026)</td><td class="v">' + R(elegFinal + pr.final.importacao) + '</td></tr></tbody></table></div>';
+    h += '<h3 class="sub">Estoque por situação de crédito</h3><div class="tbl-wrap"><table><thead><tr><th>Situação</th><th class="v">Ponto de partida</th><th class="v">Média mensal de entradas</th><th class="v">Média mensal de saídas</th><th class="v">Projetado em 31/12/2026</th></tr></thead><tbody>' +
+      E.GRUPOS.map(function (k) { return '<tr><td>' + NOMES_G[k] + '</td><td class="v">' + R(pr.saldoInicial[k]) + '</td><td class="v">' + R(pr.media[k].ent) + '</td><td class="v">' + R(pr.media[k].sai) + '</td><td class="v">' + R(pr.final[k]) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    h += '<h3 class="sub">Composição do crédito</h3><div class="tbl-wrap"><table class="mem"><tbody>' +
+      '<tr><td>Estoque elegível projetado × ' + (aliq * 100).toLocaleString('pt-BR') + '%</td><td class="v">' + R((pr.final.elegivel + outros) * aliq) + '</td></tr>' +
+      (pr.final.importacao > 0 ? '<tr><td>Importados: PIS/Cofins-Importação proporcional ao estoque projetado</td><td class="v">' + R(pr.final.importacao * pr.ratioImportacao) + '</td></tr>' : '') +
+      '<tr class="tot"><td>Crédito presumido projetado</td><td class="v">' + R(credito) + '</td></tr></tbody></table></div>';
+    h += '<h3 class="sub">Cronograma de apropriação — 12 parcelas iguais</h3><div class="tbl-wrap"><table><thead><tr><th>Parcela</th><th>Mês</th><th class="v">Valor a abater da CBS</th><th class="v">Saldo a apropriar</th></tr></thead><tbody>' +
+      cr.map(function (c) { return '<tr><td>' + c.n + 'ª</td><td>' + MESES[c.mes - 1] + '/' + c.ano + '</td><td class="v">' + brl(c.valor) + '</td><td class="v">' + brl(c.saldo) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    h += '<div class="box ok"><h2><span class="ic">🧭</span>Como fazer na prática</h2><ol class="passos">' +
+      '<li><strong>Agora:</strong> use esta projeção para estimar o crédito e planejar o caixa de 2027.</li>' +
+      '<li><strong>Em 31/12/2026:</strong> levante o inventário físico e valorize-o pelo custo de aquisição; ele vai para o Bloco H da EFD ICMS/IPI e para a contabilidade.</li>' +
+      '<li><strong>Reprocesse aqui</strong> com a EFD de dezembro (e o inventário apurado) para trocar a projeção pelo valor real.</li>' +
+      '<li><strong>Até 30/06/2027:</strong> aproprie o crédito de 9,25% sobre o estoque elegível (Decreto nº 12.955/2026, arts. 605 a 613).</li>' +
+      '<li><strong>Use em 12 parcelas mensais</strong> de ' + brl(cr[0] ? cr[0].valor : 0n) + ', a partir de ' + MESES[mesAp - 1] + '/2027, somente contra a CBS.</li></ol></div>';
+    el.innerHTML = h;
   }
 
   function filtrados() {
@@ -219,6 +332,8 @@
   }
 
   function exportarCsv() {
+    if (!st.res) { var l2 = ['mes;origem;estoque_inicial;entradas;saidas;estoque_final']; if (st.proj && !st.proj.erro) { st.proj.linhas.forEach(function (l) { var g = l.grupos.elegivel; l2.push([l.mes, l.tipo, g.ini.toFixed(2), g.ent.toFixed(2), g.sai.toFixed(2), g.fim.toFixed(2)].join(';').replace(/\./g, ',')); }); l2.push('credito_projetado;' + String(st.proj.credito.toFixed(2)).replace('.', ',')); }
+      var b2 = new Blob(['\ufeff' + l2.join('\n') + '\n'], { type: 'text/csv;charset=utf-8' }); var a2 = document.createElement('a'); a2.href = URL.createObjectURL(b2); a2.download = 'projecao-estoque-2026.csv'; document.body.appendChild(a2); a2.click(); setTimeout(function () { a2.remove(); }, 500); return; }
     var p = param(), t = totais(), linhas = ['situacao;codigo;descricao;ncm;fornecedor;cnpj_fornecedor;cfop_entrada;notas;qtd_comprada;unidade;custo_total_compras;custo_unitario;qtd_estoque;valor_estoque;credito;somado;motivo'];
     var br = function (v, c) { return E.toStr(v, c).replace('.', ','); };
     var q = function (v) { return String(v).indexOf(';') >= 0 || String(v).indexOf('"') >= 0 ? '"' + String(v).replace(/"/g, '""') + '"' : String(v); };
@@ -226,6 +341,7 @@
       var c = E.creditoProduto(x, p);
       linhas.push([x.situacao, x.cProd, x.xProd, x.NCM, x.fornecedor, x.cnpjFornecedor, x.cfops, x.notas.join(' '), br(x.qCompra, 4), x.uCom, br(x.custo, 2), br(x.custoUnit, 4), br(E.D(x.qEstoque), 4), br(c.valorEstoque, 2), x.situacao === 'nao' ? '0,00' : br(c.credito, 2), x.incluir ? 'S' : 'N', x.motivo].map(q).join(';'));
     });
+    if (st.proj && !st.proj.erro) { linhas.push(''); linhas.push('mes;origem;estoque_inicial;entradas;saidas;estoque_final'); st.proj.linhas.forEach(function (l) { var g = l.grupos.elegivel; linhas.push([l.mes, l.tipo, g.ini.toFixed(2), g.ent.toFixed(2), g.sai.toFixed(2), g.fim.toFixed(2)].join(';').replace(/\./g, ',')); }); linhas.push('credito_projetado;' + String(st.proj.credito.toFixed(2)).replace('.', ',')); }
     linhas.push(''); linhas.push('credito_total;' + br(t.credito, 2));
     E.cronograma(t.credito, Number($('#e-mes').value), 2027).forEach(function (c) { linhas.push('parcela ' + c.n + ';' + MESES[c.mes - 1] + '/' + c.ano + ';' + br(c.valor, 2)); });
     var blob = new Blob(['﻿' + linhas.join('\n') + '\n'], { type: 'text/csv;charset=utf-8' });
@@ -244,13 +360,15 @@
     ['dragenter', 'dragover'].forEach(function (t) { drop.addEventListener(t, function (ev) { ev.preventDefault(); drop.classList.add('on'); }); });
     ['dragleave', 'drop'].forEach(function (t) { drop.addEventListener(t, function (ev) { ev.preventDefault(); drop.classList.remove('on'); }); });
     drop.addEventListener('drop', function (ev) { lerSoltos(ev.dataTransfer); });
-    $('#e-limpar').addEventListener('click', function () { st.lidas = []; st.arquivos = 0; st.erros = []; st.ajustes = {}; st.res = null; $('#e-prog').hidden = true; $('#e-msg').textContent = ''; recalcular(); });
+    $('#e-limpar').addEventListener('click', function () { st.lidas = []; st.efd = []; st.proj = null; st.arquivos = 0; st.erros = []; st.ajustes = {}; st.res = null; $('#e-prog').hidden = true; $('#e-msg').textContent = ''; recalcular(); });
     $('#f-est').addEventListener('change', function (ev) {
       if (ev.target.id === 'e-cnpj') $('#e-cnpj').dataset.manual = $('#e-cnpj').value.trim() ? '1' : '';
       if (ev.target.id === 'e-nome') { $('#e-nome').dataset.manual = '1'; if (st.res) renderResumo(); return; }
       if (st.res) recalcular(false);
     });
     $('#f-est').addEventListener('submit', function (ev) { ev.preventDefault(); });
+    var pc = $('#e-proj-card');
+    if (pc) { pc.addEventListener('change', function () { $('#e-estinf-w').hidden = $('#e-ini').value !== 'informado'; if (st.efd.length) renderResumo(); }); pc.addEventListener('input', function (ev) { if (st.efd.length && ev.target.matches('input')) renderResumo(); }); }
     $('#e-outros').addEventListener('input', function () { if (st.res) renderResumo(); });
     $('#e-aliq').addEventListener('input', function () { if (st.res) { renderResumo(); renderTabela(); } });
     $('#e-pct-ap').addEventListener('click', function () {

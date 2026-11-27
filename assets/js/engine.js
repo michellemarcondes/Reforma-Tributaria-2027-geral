@@ -363,7 +363,10 @@
     var p = Object.assign({}, PREMISSAS_PADRAO, e.premissas || {});
     var reg = REGIMES[e.regime] || REGIMES.LP;
     var fp = faturamentoPorCategoria(e), bruto = fp.bruto;
-    var desc = D(e.descontos), icms = D(e.icms), iss = D(e.iss);
+    // devolucoes/descontos por faixa (e.devolucoes {k: R$}) e, por compatibilidade, descontos gerais rateados (e.descontos)
+    var devK = {}, devTot = 0n;
+    CATEGORIAS.forEach(function (c) { devK[c.k] = D((e.devolucoes || {})[c.k]); if (devK[c.k] < 0n) devK[c.k] = 0n; devTot += devK[c.k]; });
+    var descGeral = D(e.descontos), desc = descGeral + devTot, icms = D(e.icms), iss = D(e.iss);
     if (reg.grupo === 'simples') { icms = 0n; iss = 0n; } // no Simples padrao ICMS/ISS nao saem da base
     var res = { regime: e.regime, regimeNome: reg.nome, receitaBruta: bruto, descontos: desc, icms: icms, iss: iss, deducoes: desc + icms + iss, avisos: [] };
     if (reg.grupo === 'simples' || reg.grupo === 'hibrido') {
@@ -373,15 +376,15 @@
     }
     // rateio das deducoes por faixa
     var pesos = CATEGORIAS.map(function (c) { return fp.fat[c.k]; });
-    var dedDesc = ratear(desc, pesos), dedIcms = ratear(icms, pesos), dedIss = ratear(iss, pesos);
+    var dedDesc = ratear(descGeral, pesos), dedIcms = ratear(icms, pesos), dedIss = ratear(iss, pesos);
     res.porCategoria = [];
     var debCbs = 0n, debIbs = 0n, baseTot = 0n;
     CATEGORIAS.forEach(function (c, i) {
-      var f = fp.fat[c.k]; if (f <= 0n) return;
-      var ded = dedDesc[i] + dedIcms[i] + dedIss[i];
+      var f = fp.fat[c.k]; if (f <= 0n && devK[c.k] <= 0n) return;
+      var ded = devK[c.k] + dedDesc[i] + dedIcms[i] + dedIss[i];
       var base = f - ded; if (base < 0n) base = 0n;
       base = roundHE(base, 2);
-      var linha = { k: c.k, nome: c.nome, paga: c.paga, red: c.red, faturamento: f, deducoes: ded, base: base };
+      var linha = { k: c.k, nome: c.nome, paga: c.paga, red: c.red, faturamento: f, devolucoes: devK[c.k] + dedDesc[i], deducoes: ded, base: base };
       if (reg.grupo === 'simples') {
         if (c.sn) {
           var it = calcularItemSimples(base, s.pCBSSN, s.pIBSSN, null);
